@@ -1,0 +1,2432 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notenbuch - created by Markus Seitz</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#1d2330; --muted:#667085; --line:#e3e6ec;
+    --accent:#2f5bd3; --accent-soft:#e8eefc; --warn:#b54708; --warn-bg:#fff6e5; --bad:#b42318; --bad-bg:#fdecea;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header.top{background:var(--card);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+  h1{font-size:21px;margin:0;display:flex;align-items:center;gap:10px}
+  h1 .byline{font-size:13px;font-weight:400;color:var(--muted);margin-left:2px}
+  h1 .logo{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:16px}
+  h2{font-size:16px;margin:0 0 12px}
+  .tabs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .tabs button{border:0;background:transparent;padding:8px 16px;border-radius:8px;font:inherit;cursor:pointer;color:var(--muted)}
+  .tabs button.active{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .wrap{max-width:1400px;margin:0 auto;padding:20px 24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+  .field{margin-bottom:14px}
+  .field>label,.field>.lbl,.lbl{display:block;font-weight:600;font-size:13px;margin-bottom:5px}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  input[type=number],input[type=text],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  input:disabled{background:var(--bg);color:var(--muted)}
+  input.invalid{border-color:var(--bad)}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg label{flex:1;min-width:70px;text-align:center;border:1px solid var(--line);border-radius:8px;padding:7px 6px;cursor:pointer;font-size:13px;font-weight:400;margin:0}
+  .seg input{display:none}
+  .seg label:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+  .seg label:has(input:disabled){opacity:.55;cursor:not-allowed}
+  .row{display:flex;gap:8px;align-items:center}
+  .row input[type=range]{flex:1}
+  .chk{display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px;font-weight:400}
+  .btn{border:1px solid var(--line);background:#fff;padding:7px 12px;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{color:#fff;opacity:.9}
+  .btn.danger{color:var(--bad);border-color:#f3c2bd;margin-right:auto}
+  .btn.danger:hover{background:var(--bad-bg)}
+  .warn{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:10px}
+  .badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);vertical-align:middle}
+  .badge.kurs{background:#efe8fc;color:#6a3fc7}
+  .summary{color:var(--muted);font-size:13px;margin:-6px 0 12px}
+
+  /* ---------- Rechner ---------- */
+  .rechner{display:grid;grid-template-columns:330px 1fr;gap:20px}
+  @media (max-width:860px){.rechner{grid-template-columns:1fr}}
+  .subbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px}
+  .linkbar{flex:1;background:var(--accent-soft);border:1px solid #c6d4f7;border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
+  .linkbar span{flex:1;min-width:240px}
+  table.key{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  table.key th,table.key td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:right}
+  table.key th{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600}
+  table.key th:first-child,table.key td:first-child{text-align:left}
+  td.grade{font-weight:700}
+  tr.fail td{background:var(--bad-bg);color:var(--bad)}
+  tr.na td{color:#aab0bc;text-decoration:line-through}
+  table.key td input{width:80px;padding:3px 6px;text-align:right}
+  .result{font-size:28px;font-weight:700;margin-top:6px}
+  .result small{font-size:14px;color:var(--muted);font-weight:400}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media (max-width:1050px){.two{grid-template-columns:1fr}}
+  .bar{height:8px;background:var(--accent);border-radius:4px;min-width:1px}
+  .printhead{display:none}
+
+  /* ---------- Notenbuch ---------- */
+  .buch{display:grid;grid-template-columns:250px 1fr;gap:20px;align-items:start}
+  @media (max-width:860px){.buch{grid-template-columns:1fr}}
+  .side ul{list-style:none;margin:0 0 12px;padding:0}
+  .side li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .side li:hover{background:var(--bg)}
+  .side li.active{background:var(--accent-soft);font-weight:600}
+  .side li.empty{color:var(--muted);cursor:default;font-size:13px}
+  .side h3{font-size:13px;margin:18px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+  .side .btn{width:100%;margin-bottom:6px}
+  .buchhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+  .buchhead h2{margin-bottom:4px}
+  .buchhead .summary{margin:0}
+  .toolbar{display:flex;flex-wrap:wrap;gap:6px}
+  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+  table.gb{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;font-size:14px;min-width:100%}
+  table.gb th,table.gb td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 6px;text-align:center;white-space:nowrap;background:#fff}
+  table.gb thead th{background:#fafbfc;font-size:12px;font-weight:600;color:var(--ink)}
+  table.gb th.cat{color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-size:11px}
+  table.gb th small{display:block;font-weight:400;color:var(--muted);font-size:11px;line-height:1.3;margin-top:2px}
+  table.gb th.lh{cursor:pointer;min-width:74px}
+  table.gb th.lh:hover{background:var(--accent-soft);color:var(--accent)}
+  table.gb .nr{color:var(--muted);font-size:12px;width:34px}
+  table.gb .name{text-align:left;position:sticky;left:0;z-index:2;min-width:170px;font-weight:500}
+  table.gb thead .name{z-index:3}
+  table.gb td.name{cursor:pointer}
+  table.gb td.name:hover{color:var(--accent)}
+  table.gb .avgcol{background:#f8f9fb}
+  table.gb td.tot{font-weight:700}
+  table.gb tfoot td{background:#f2f4f7;font-weight:600}
+  table.gb tfoot td small{font-weight:400;color:var(--muted)}
+  table.gb input{width:58px;padding:4px;text-align:center;border:1px solid transparent;border-radius:6px;background:transparent;font:inherit}
+  table.gb input:hover{border-color:var(--line)}
+  table.gb input:focus{background:#fff;border-color:var(--accent);outline:2px solid var(--accent-soft)}
+  table.gb input.zeugnis{width:64px;font-weight:700}
+  table.gb input.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+  table.gb input.skip{color:var(--muted)}
+  table.gb .g{display:block;min-height:26px;line-height:0}
+  .gpill{display:inline-block;min-width:36px;padding:3px 8px;border-radius:8px;font-size:16px;font-weight:700;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
+  table.gb td.pc{padding:4px 6px}
+  table.gb input.pt{font-size:11px;color:var(--muted);width:52px;padding:1px 4px;margin-top:2px}
+  table.gb input.pt:focus{color:var(--ink);font-size:13px}
+  table.gb input.nm{font-size:16px;font-weight:700;width:52px;padding:3px 4px;border-radius:8px}
+  table.gb input.nm.nmok{border-color:transparent}
+  table.gb .g.sm{height:22px;line-height:0;margin-top:1px}
+  table.gb .g.sm svg{vertical-align:top}
+  .smiley{display:inline-block;vertical-align:middle}
+  #smPicker{position:fixed;z-index:50;display:flex;gap:4px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+  #smPicker button{border:2px solid transparent;background:transparent;border-radius:9px;padding:2px 3px 1px;cursor:pointer;display:flex;flex-direction:column;align-items:center;font:inherit;font-size:11px;color:var(--muted);line-height:1.2}
+  #smPicker button:hover,#smPicker button.on{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+  #smPicker .clr{font-size:16px;width:30px;height:44px;justify-content:center}
+  @media print{#smPicker{display:none!important}}
+  .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
+  .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
+  .emptystate h2{color:var(--ink)}
+
+  /* ---------- Dialog ---------- */
+  dialog{border:0;border-radius:14px;padding:0;width:min(580px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.25);color:var(--ink)}
+  dialog.wide{width:min(760px,96vw)}
+  .grid3{display:grid;grid-template-columns:150px 1fr 90px;gap:12px}
+  @media (max-width:560px){.grid3{grid-template-columns:1fr 1fr}}
+  .qlist{max-height:58vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .qrow{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line)}
+  .qrow:last-child{border-bottom:0}
+  .qrow:nth-child(even){background:#fafbfc}
+  .qrow.has .qname{font-weight:600}
+  .qname{flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qsm{display:flex;gap:2px}
+  .qsm button{border:2px solid transparent;background:transparent;border-radius:50%;padding:1px;cursor:pointer;line-height:0;opacity:.45;transition:opacity .1s,transform .1s}
+  .qsm button:hover{opacity:1;transform:scale(1.1)}
+  .qsm button.on{opacity:1;border-color:var(--ink);transform:scale(1.12)}
+  .qrow:not(.has) .qsm button{opacity:.8}
+  .qval{width:52px!important;text-align:center;padding:5px!important}
+  .qclr{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
+  .qclr:hover{color:var(--bad)}
+  table.gb th.gh{cursor:pointer;min-width:96px}
+  table.gb th.gh:hover{background:var(--accent-soft);color:var(--accent)}
+  table.gb th.gh .gnr{font-size:16px;font-weight:700}
+  table.gb td.gcell{vertical-align:middle;min-width:96px;max-width:190px;white-space:normal;padding:4px 6px}
+  .gsms{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+  .gsm{display:inline-block;line-height:0;border-radius:50%}
+  .gsm.badv{display:inline-block;text-align:center}
+  .gsm.badv{line-height:24px;width:24px;height:24px;background:var(--bad-bg);color:var(--bad);font-weight:700;font-size:12px}
+  .gavg{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600}
+  .gcnt{font-weight:400}
+  .nrwahl{display:flex;flex-direction:column;gap:8px}
+  .nrbtn{display:flex;align-items:center;gap:14px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font:inherit}
+  .nrbtn:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .nrbtn .gnr{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:18px;flex:none}
+  .nrbtn.neu{border-style:dashed}
+  .nrbtn small{display:block;color:var(--muted);font-size:12px}
+  .tlist{border:1px solid var(--line);border-radius:10px;max-height:50vh;overflow:auto}
+  .trow{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--line)}
+  .trow:last-child{border-bottom:0}
+  .tdate{font-weight:600;width:72px;font-variant-numeric:tabular-nums}
+  .tname{flex:1;color:var(--muted)}
+  .tinfo{font-size:12px;color:var(--muted)}
+  table.gb td.gcell{cursor:pointer}
+  table.gb td.gcell:not(.entrycol):hover{background:#f4f7fe;box-shadow:inset 0 0 0 1px #c6d4f7}
+  table.gb .entrycol{background:#fff8e6!important;box-shadow:inset 2px 0 0 #f0b429,inset -2px 0 0 #f0b429}
+  table.gb td.gcell.entrycol{max-width:none;min-width:176px;cursor:default}
+  .epick{display:flex;gap:2px;justify-content:center;margin:2px 0}
+  .epick .ep{border:2px solid transparent;background:transparent;border-radius:50%;padding:1px;cursor:pointer;line-height:0;opacity:.75;transition:transform .1s,opacity .1s}
+  .epick .ep:hover{opacity:1;transform:scale(1.15)}
+  .epick .ep.on{opacity:1;border-color:var(--ink);transform:scale(1.12)}
+  .epick:has(.on) .ep:not(.on){opacity:.3}
+  .entrybar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#fff8e6;border:1px solid #f0d48a;border-radius:10px;padding:8px 12px;margin-bottom:10px}
+  .entrybar input[type=date]{width:auto}
+  table.gb th.gh{cursor:default}
+  table.gb th.gh .gnr{font-size:16px;font-weight:700;cursor:pointer;padding:0 4px;border-radius:4px}
+  table.gb th.gh .gnr:hover{background:var(--accent-soft);color:var(--accent)}
+  table.gb th.gh small{display:block}
+  table.gb .grpadd{margin-left:6px;border:1px dashed var(--accent);background:#fff;border-radius:6px;padding:0 8px;font:inherit;font-size:14px;line-height:20px;cursor:pointer;color:var(--accent);font-weight:700;vertical-align:2px}
+  table.gb .grpadd:hover{background:var(--accent);color:#fff;border-style:solid}
+  table.gb th.dh{cursor:pointer;font-size:12px;min-width:44px}
+  table.gb th.dh:hover{background:var(--accent-soft);color:var(--accent)}
+  table.gb td.tcell{cursor:pointer;min-width:44px;height:44px}
+  table.gb td.tcell:not(.entrycol):hover{background:#f4f7fe}
+  table.gb td.tcell.entrycol{min-width:176px;cursor:default}
+  table.gb th.gavgh,table.gb td.gavgc{background:#f6f8fc;font-size:12px;color:var(--muted);min-width:44px}
+  table.gb th.gstart,table.gb td.gstart{border-left:2px solid #dfe5f0}
+  .adef{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .atask{display:flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:8px;padding:3px 6px;background:#fafbfc}
+  .atask .an{width:64px;padding:4px 6px;font-weight:600}
+  .atask .am{width:62px;padding:4px 6px;text-align:right}
+  .atask span{font-size:12px;color:var(--muted)}
+  .aout{font-size:13px;margin-bottom:10px;line-height:1.6}
+  table.atab th small{display:block;font-weight:400;text-transform:none;letter-spacing:0}
+  table.atab th,table.atab td{text-align:center;padding:4px 6px}
+  table.atab .anr{color:var(--muted);font-size:12px;width:30px}
+  table.atab td input.ap{width:56px;padding:4px;text-align:center}
+  table.atab td input.ap.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+  table.atab td input.arn{width:100%;min-width:150px;padding:4px 6px;text-align:left}
+  table.atab td.asum{font-weight:700}
+  table.atab tfoot td{background:#f6f8fc;font-size:13px;font-weight:600}
+  .qbar{height:6px;background:#e9edf3;border-radius:3px;margin:2px auto 2px;width:48px;overflow:hidden}
+  .qbar div{height:100%;border-radius:3px}
+  .atools{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+  .atools select{width:auto}
+  dialog.xwide{width:min(1100px,97vw)}
+  .modi{display:flex;flex-direction:column;gap:6px}
+  .modus{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:400}
+  .modus:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+  .modus input{margin-top:3px}
+  .modus small{display:block;color:var(--muted);font-size:12px}
+  table.gb input.ro{cursor:pointer;color:var(--ink)}
+  table.gb input.ro:hover{background:var(--accent-soft)}
+  table.atab td input.pp{width:60px;padding:4px;text-align:center}
+  table.atab td input.pp.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+  .ptab thead th{position:sticky;top:0;background:#fafbfc;z-index:1}
+  .spiegelmini{display:inline-flex;flex-wrap:wrap;gap:4px 12px;color:var(--muted)}
+  .spiegelmini b{color:var(--ink)}
+  .auswbtn{display:block;margin:4px auto 0;border:1px solid var(--line);background:#fff;border-radius:6px;font:inherit;font-size:11px;padding:1px 6px;color:var(--accent);cursor:pointer;letter-spacing:-.5px}
+  .auswbtn:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .aw-head{display:grid;grid-template-columns:repeat(3,minmax(110px,150px)) 1fr;gap:10px}
+  @media (max-width:760px){.aw-head{grid-template-columns:1fr 1fr}}
+  .aw-seg label{min-width:0;padding:6px 12px;flex:none}
+  .tile:not(.wide){align-self:start}
+  .tile{background:var(--bg);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column}
+  .tile small{color:var(--muted);font-size:12px}
+  .tile b{font-size:24px;line-height:1.2}
+  .tile span{color:var(--muted);font-size:12px}
+  .tile.wide .cc{margin-top:4px}
+  .aw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .aw-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .aw-ct{display:flex;justify-content:space-between;align-items:baseline}
+  .aw-ct span{color:var(--muted);font-size:12px}
+  .aw-kpi{font-size:13px;color:var(--muted);margin:2px 0 8px}
+  .aw-kpi b{color:var(--ink)}
+  .aw-h3{font-size:15px;margin:16px 0 8px}
+  .aw-axis{font-size:11px;color:var(--muted);text-align:center;margin-top:2px}
+  .cc{display:flex;align-items:flex-end;gap:2px;border-bottom:1px solid var(--line);padding-bottom:0}
+  .ccol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;position:relative}
+  .ccol:hover .cbar{filter:brightness(.88)}
+  .cbar{width:72%;max-width:28px;border-radius:4px 4px 0 0}
+  .cn{font-size:11px;color:var(--ink);font-weight:600;line-height:14px;height:14px}
+  .cl{position:absolute;bottom:-18px;font-size:10px;color:var(--muted);white-space:nowrap}
+  .cc{margin-bottom:20px}
+  .aw-tab th,.aw-tab td{padding:4px 6px;font-size:13px}
+  .aw-tab td.zero{color:#c4c9d2}
+  .aw-tab td.has{font-weight:700;background:var(--accent-soft)}
+  .aw-tab td.na-c{background:repeating-linear-gradient(45deg,#f4f5f7 0 4px,#fff 4px 8px)}
+  dialog::backdrop{background:rgba(20,25,35,.4)}
+  .dlgform{padding:20px 22px}
+  .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .keybox{background:var(--bg);border-radius:10px;padding:12px}
+  .keysum{font-size:13px;font-weight:600}
+  .keymini{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:12px;margin:8px 0 10px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .keymini b{color:var(--ink)}
+  .katrow{display:grid;grid-template-columns:1fr 120px 70px 56px 34px;gap:8px;align-items:center;margin-bottom:6px}
+  .katrow .x{padding:6px 0;text-align:center}
+  .katrow .kp{font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+  .kathead{display:grid;grid-template-columns:1fr 120px 70px 56px 34px;gap:8px;font-size:11px;color:var(--muted);margin-bottom:4px}
+  .kathead span:nth-child(3),.kathead span:nth-child(4){text-align:right}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .chip{border:1px dashed #b9c3d6;background:#fff;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer;color:var(--muted)}
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+  table.gb th.cat{cursor:pointer}
+  table.gb th.cat:hover .cn{color:var(--accent)}
+  table.gb th.cat .cw{font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px}
+  table.gb .catadd{margin-left:8px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:0 7px;font:inherit;font-size:13px;line-height:20px;cursor:pointer;color:var(--accent);font-weight:700}
+  table.gb .catadd:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  table.gb .catavg{background:#eef2fb;font-weight:600;border-right:2px solid #c9d3ea}
+  table.gb th.catavg{color:var(--accent)}
+  table.gb th.catstart,table.gb td.catstart{border-left:2px solid #c9d3ea}
+  table.gb th.emptycat{color:var(--muted);font-weight:400;font-size:11px;white-space:normal;min-width:90px}
+
+  @media print{
+    body{background:#fff;font-size:12px}
+    header.top,.noprint,.side,.controls,.toolbar{display:none!important}
+    .wrap{padding:0;max-width:none}
+    .rechner,.buch{display:block}
+    .card{border:0;padding:0}
+    .printhead{display:block;margin-bottom:10px}
+    .printhead h1{font-size:18px}
+    .tablewrap{overflow:visible;border:0}
+    table.gb th,table.gb td{border:1px solid #bbb;padding:3px 4px}
+    table.gb input{border:0;width:auto;max-width:60px;padding:0}
+    table.gb .name{position:static}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><span class="logo">N</span>Notenbuch<span class="byline">- created by Markus Seitz</span></h1>
+  <nav class="tabs" id="appTabs">
+    <button data-view="buch">Notenbuch</button>
+    <button data-view="rechner">Notenschlüssel-Rechner</button>
+  </nav>
+</header>
+
+<!-- ======================= NOTENBUCH ======================= -->
+<div id="view-buch" class="wrap" hidden>
+  <div class="buch">
+    <aside class="card side">
+      <h2>Klassen &amp; Kurse</h2>
+      <ul id="klassenListe"></ul>
+      <button class="btn primary" id="neueKlasse" type="button">+ Klasse / Kurs</button>
+      <h3>Datensicherung</h3>
+      <button class="btn" id="exportJson" type="button">Sicherung herunterladen</button>
+      <button class="btn" id="importBtn" type="button">Sicherung laden …</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <div class="hint">Alle Daten liegen nur in diesem Browser auf diesem Gerät. Regelmäßig sichern!</div>
+    </aside>
+    <section class="card" id="buchMain" style="min-width:0"></section>
+  </div>
+</div>
+
+<!-- ======================= RECHNER ======================= -->
+<div id="view-rechner" class="wrap" hidden>
+  <div class="subbar noprint">
+    <div class="tabs" id="stufeTabs">
+      <button data-stufe="mittel">Mittelstufe (Note 1–6)</button>
+      <button data-stufe="kurs">Kursstufe (0–15 VP)</button>
+    </div>
+    <div class="linkbar" id="linkbar" hidden></div>
+  </div>
+  <div class="rechner">
+    <section class="card controls">
+      <h2>Einstellungen</h2>
+
+      <div class="field" id="titelField">
+        <label for="titel">Titel der Arbeit (für Ausdruck)</label>
+        <input type="text" id="titel" data-k="titel" placeholder="z. B. Klassenarbeit Nr. 2">
+      </div>
+
+      <div class="field">
+        <label for="total">Gesamtpunktzahl</label>
+        <input type="number" id="total" data-k="total" min="1" step="0.5">
+      </div>
+
+      <div class="field">
+        <label for="step">Punkteschritte</label>
+        <select id="step" data-k="step">
+          <option value="1">ganze Punkte</option>
+          <option value="0.5">halbe Punkte</option>
+          <option value="0.25">Viertelpunkte</option>
+        </select>
+        <div class="hint">Kleinste vergebene Punkteinheit; Grenzen werden darauf aufgerundet.</div>
+      </div>
+
+      <div class="field" data-show="mittel">
+        <span class="lbl">Notenskala</span>
+        <div class="seg">
+          <label><input type="radio" name="skala" value="ganz" data-k="skala">ganze</label>
+          <label><input type="radio" name="skala" value="halb" data-k="skala">halbe</label>
+          <label><input type="radio" name="skala" value="viertel" data-k="skala">Viertel</label>
+        </div>
+        <div class="hint" id="skalaHint"></div>
+      </div>
+      <div class="field" data-show="kurs">
+        <span class="lbl">Notenskala</span>
+        <div class="hint" style="margin-top:0">Ganze Verrechnungspunkte 00–15.</div>
+      </div>
+
+      <div class="field">
+        <label for="typ">Schlüsseltyp</label>
+        <select id="typ" data-k="typ">
+          <option value="linear">linear</option>
+          <option value="knick">nichtlinear – geknickt (Bestehensgrenze)</option>
+          <option value="kurve">nichtlinear – Kurve (Exponent)</option>
+          <option value="custom">nichtlinear – frei einstellbar</option>
+        </select>
+      </div>
+
+      <div class="field" data-notyp="custom">
+        <label for="sockel">Sockel (%)</label>
+        <div class="row">
+          <input type="range" id="sockelR" data-k="sockel" min="0" max="80" step="1">
+          <input type="number" id="sockel" data-k="sockel" min="0" max="95" step="0.5" style="width:80px">
+        </div>
+        <div class="hint" id="sockelHint"></div>
+      </div>
+
+      <div class="field" data-notyp="custom">
+        <label for="top">Bestnote ab (%)</label>
+        <input type="number" id="top" data-k="top" min="1" max="100" step="0.5">
+        <label class="chk"><input type="checkbox" id="topAuto" data-k="topAuto"> automatisch (gleich breite Stufen)</label>
+      </div>
+
+      <div class="field" data-typ="knick">
+        <label for="knick" id="knickLbl">Bestehensgrenze ab (%)</label>
+        <input type="number" id="knick" data-k="knick" min="1" max="99" step="0.5">
+        <div class="hint">Zwischen Sockel und Bestehensgrenze sowie zwischen Bestehensgrenze und Bestnote wird jeweils linear verteilt.</div>
+      </div>
+
+      <div class="field" data-typ="kurve">
+        <label for="exp">Krümmung (Exponent)</label>
+        <div class="row">
+          <input type="range" id="expR" data-k="exp" min="0.4" max="2.5" step="0.05">
+          <input type="number" id="exp" data-k="exp" min="0.2" max="4" step="0.05" style="width:80px">
+        </div>
+        <div class="hint">1 = linear · &gt; 1 = mittlere Noten milder · &lt; 1 = mittlere Noten strenger</div>
+      </div>
+
+      <div class="field" data-typ="custom">
+        <div class="hint" style="margin-top:0;margin-bottom:8px">Prozentgrenzen direkt in der Tabelle bearbeiten. Die Grenze der schwächsten Note (über 6 bzw. 00) ist der Sockel.</div>
+        <div class="seg" style="gap:8px">
+          <button class="btn" id="resetCustom" type="button">Linear neu befüllen</button>
+          <button class="btn" id="abiPreset" type="button" data-show="kurs">Abitur-Standard laden</button>
+        </div>
+      </div>
+
+      <div class="field noprint" style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" type="button" id="toBuch">→ Als Arbeit / Test ins Notenbuch</button>
+        <button class="btn" type="button" onclick="window.print()">Drucken / PDF</button>
+        <button class="btn" type="button" id="csvBtn">CSV</button>
+        <button class="btn" type="button" id="resetAll">Zurücksetzen</button>
+      </div>
+    </section>
+
+    <div class="stack">
+      <section class="card">
+        <div class="printhead"><h1 id="printTitle"></h1></div>
+        <h2 class="noprint">Notenschlüssel</h2>
+        <div class="summary" id="summary"></div>
+        <div id="warnings"></div>
+        <table class="key" id="keyTable"></table>
+      </section>
+
+      <div class="two noprint">
+        <section class="card">
+          <h2>Schnellrechner</h2>
+          <div class="field">
+            <label for="calcPts">Erreichte Punkte</label>
+            <input type="number" id="calcPts" min="0" step="0.25" placeholder="z. B. 27,5">
+          </div>
+          <div class="result" id="calcRes">–</div>
+        </section>
+        <section class="card">
+          <h2>Notenspiegel</h2>
+          <div class="field">
+            <label for="list">Punkte aller Arbeiten</label>
+            <textarea id="list" rows="4" placeholder="getrennt durch Leerzeichen, Semikolon oder Zeilenumbruch, z. B. 31; 27,5; 18"></textarea>
+          </div>
+          <div id="spiegel"></div>
+        </section>
+      </div>
+      <section class="card" id="aufgCard">
+        <h2>Auswertung nach Aufgaben</h2>
+        <div class="hint" style="margin:-6px 0 12px">Punkte je Aufgabe eintragen – das Programm zählt zusammen, vergibt die Note nach dem Schlüssel oben und wertet jede Aufgabe aus. Enter bzw. ↑/↓ wechselt die Zeile.</div>
+        <div id="aufgBox"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg"></dialog>
+<div id="smPicker" hidden></div>
+
+<script>
+(() => {
+  /* ============================================================
+     Gemeinsame Hilfsfunktionen
+     ============================================================ */
+  const $ = id => document.getElementById(id);
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const copy = o => JSON.parse(JSON.stringify(o));
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const num = (x, d=2) => Number(x).toLocaleString('de-DE', {maximumFractionDigits:d});
+  const ceilStep = (x, st) => Math.max(0, Math.ceil(x/st - 1e-9) * st);
+  const roundStep = (x, st) => Math.round(x/st) * st;
+  const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+  const fmtDate = d => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(2,4) : '';
+  const download = (name, text, type) => {
+    const blob = new Blob([text], {type});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  const csvCell = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+
+  /* ============================================================
+     Notenschlüssel – Berechnung
+     ============================================================ */
+  const ABI = [20,27,33,40,45,50,55,60,65,70,75,80,85,90,95]; // 01..15 VP
+  const TYP = {linear:'linear', knick:'geknickt', kurve:'Kurve', custom:'frei eingestellt'};
+  const SKALA = {ganz:'ganze Noten', halb:'halbe Noten', viertel:'Viertelnoten'};
+  const DEF = {
+    stufe: 'mittel', titel: '',
+    mittel: {total:40, step:0.5, skala:'halb', sockel:20, typ:'linear', topAuto:true, top:90, knick:50, exp:1, custom:{}},
+    kurs:   {total:60, step:0.5, sockel:20, typ:'linear', topAuto:true, top:95, knick:45, exp:1, custom:{}}
+  };
+  let S;
+  try { S = JSON.parse(localStorage.getItem('notenschluessel-v1')) || null; } catch(e) { S = null; }
+  if (!S || !S.mittel || !S.kurs) S = copy(DEF);
+  const save = () => { try { localStorage.setItem('notenschluessel-v1', JSON.stringify(S)); } catch(e){} };
+  const cur = () => S[S.stufe];
+
+  function mLabel(v, skala){
+    const f = Math.round((v - Math.floor(v)) * 100), b = Math.floor(v);
+    if (f === 0) return String(b);
+    if (skala === 'halb') return num(v);
+    if (f === 25) return b + '-';
+    if (f === 50) return b + '-' + (b+1);
+    if (f === 75) return (b+1) + '+';
+    return num(v);
+  }
+  function kursNote(v){
+    if (v === 0) return '6';
+    const n = 5 - Math.floor((v-1)/3), t = (v-1) % 3;
+    return n + (t === 2 ? '+' : t === 0 ? '-' : '');
+  }
+  function gradeList(stufe, st){
+    if (stufe === 'kurs')
+      return Array.from({length:15}, (_, i) => ({v:i+1, label:String(i+1).padStart(2,'0'), note:kursNote(i+1)}));
+    const d = {ganz:1, halb:0.5, viertel:0.25}[st.skala] || 0.5;
+    const low = st.skala === 'ganz' ? 5 : 5.5;
+    const out = [];
+    for (let k = 0; low - k*d >= 1 - 1e-9; k++){
+      const v = +(low - k*d).toFixed(2);
+      out.push({v, label:mLabel(v, st.skala)});
+    }
+    return out;
+  }
+  const FAIL = {mittel:{v:6, label:'6'}, kurs:{v:0, label:'00', note:'6'}};
+  const passIdx = (stufe, G) => G.findIndex(g => g.v === (stufe === 'kurs' ? 5 : 4));
+  const customKey = (stufe, st) => stufe === 'kurs' ? 'kurs' : st.skala;
+
+  function thresholds(stufe, st, typ, warn){
+    const G = gradeList(stufe, st), n = G.length;
+    const s = Math.min(Math.max(+st.sockel || 0, 0), 99);
+    const autoTop = 100 - (100 - s)/n;
+    let top = st.topAuto ? autoTop : +st.top;
+    if (!(top > s && top <= 100)){ warn && warn.push('„Bestnote ab“ muss zwischen Sockel und 100 % liegen – es wird der automatische Wert verwendet.'); top = autoTop; }
+    if (typ === 'custom'){
+      st.custom = st.custom || {};
+      const key = customKey(stufe, st);
+      let p = st.custom[key];
+      if (!Array.isArray(p) || p.length !== n) p = st.custom[key] = thresholds(stufe, st, 'linear').p.map(x => +x.toFixed(1));
+      return {G, p: p.map(Number), s:p[0], top:p[n-1]};
+    }
+    let P = 0; const m = passIdx(stufe, G);
+    if (typ === 'knick'){
+      P = +st.knick;
+      if (!(P > s && P < top)){ warn && warn.push('Die Bestehensgrenze muss zwischen Sockel und „Bestnote ab“ liegen – es wird linear gerechnet.'); P = s + (top - s) * m/(n-1); }
+    }
+    const e = Math.max(0.1, +st.exp || 1);
+    const p = G.map((g, i) => {
+      const x = i/(n-1);
+      if (typ === 'kurve') return s + (top - s) * Math.pow(x, e);
+      if (typ === 'knick') return i <= m ? (m ? s + (P - s) * i/m : s) : P + (top - P) * (i - m)/(n - 1 - m);
+      return s + (top - s) * x;
+    });
+    return {G, p, s, top};
+  }
+
+  function compute(stufe, st){
+    const warn = [];
+    const total = Math.max(+st.total || 0, 0.25), step = +st.step || 1;
+    const {G, p, top} = thresholds(stufe, st, st.typ, warn);
+    const n = G.length;
+    if (st.typ === 'custom'){
+      for (let i = 1; i < n; i++) if (!(p[i] > p[i-1])){ warn.push('Die Prozentgrenzen müssen von unten nach oben streng ansteigen (Note ' + G[i].label + ').'); break; }
+      if (p.some(x => !(x >= 0 && x <= 100))) warn.push('Prozentgrenzen müssen zwischen 0 und 100 % liegen.');
+    }
+    const minPts = p.map(x => ceilStep(x * total / 100, step));
+    const rows = [];
+    for (let i = n - 1; i >= 0; i--){
+      const to = i < n - 1 ? minPts[i+1] - step : roundStep(Math.floor(total/step + 1e-9)*step, step);
+      rows.push({g:G[i], pct:p[i], from:minPts[i], to, i, na: to < minPts[i] - 1e-9});
+    }
+    rows.push({g:FAIL[stufe], pct:0, from:0, to:minPts[0] - step, i:-1, fail:true, na: minPts[0] - step < 0});
+    const na = rows.filter(r => r.na).map(r => r.g.label);
+    if (na.length) warn.push('Nicht erreichbar bei dieser Gesamtpunktzahl/Schrittweite: ' + na.join(', ') + '. Feinere Punkteschritte oder eine gröbere Notenskala wählen.');
+    return {stufe, st, total, step, G, p, minPts, rows, warn, top};
+  }
+
+  function gradeFor(R, pts){
+    if (pts < R.minPts[0] - 1e-9) return {g:FAIL[R.stufe], i:-1};
+    let i = 0;
+    for (let k = 0; k < R.minPts.length; k++) if (pts >= R.minPts[k] - 1e-9) i = k;
+    return {g:R.G[i], i};
+  }
+  const keySummary = (stufe, key) => {
+    const R = compute(stufe, key);
+    return num(R.total) + ' Punkte · ' + (stufe === 'kurs' ? '00–15 VP' : SKALA[key.skala]) +
+      ' · Sockel ' + num(R.p[0], 1) + ' % · ' + TYP[key.typ];
+  };
+
+  /* ============================================================
+     Notenbuch – Daten
+     ============================================================ */
+  let DB;
+  try { DB = JSON.parse(localStorage.getItem('notenbuch-v1')); } catch(e) { DB = null; }
+  if (!DB || !Array.isArray(DB.klassen)) DB = {klassen:[], aktiv:null, view:'buch'};
+  const saveDB = () => { try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
+  const aktKlasse = () => DB.klassen.find(k => k.id === DB.aktiv) || null;
+
+  /* ---------- Smiley-Eingabe direkt in der Tabelle ---------- */
+  let entry = null; // {kid, lid} – Termin, der gerade für alle Schüler·innen eingetragen wird
+  const entryL = () => {
+    const k = aktKlasse();
+    if (!entry || !k || k.id !== entry.kid) return null;
+    return k.leistungen.find(l => l.id === entry.lid) || null;
+  };
+  function startEntry(k, c, nr){
+    if (entry) finishEntry(true);
+    const l = {id:uid(), name:'', datum:today(), kat:c.id, gruppe:nr, gew:1, typ:'note', key:null, werte:{}};
+    k.leistungen.push(l); entry = {kid:k.id, lid:l.id, neu:true};
+    saveDB(); renderBuch(); scrollToEntry();
+  }
+  function editEntry(k, l){
+    if (entry && entry.lid === l.id) return;
+    if (entry) finishEntry(true);
+    entry = {kid:k.id, lid:l.id, neu:false};
+    renderBuch(); scrollToEntry();
+  }
+  function scrollToEntry(){
+    const th = document.querySelector('th.dh.entrycol');
+    if (th) th.scrollIntoView({inline:'center', block:'nearest'});
+  }
+  function finishEntry(silent){
+    if (!entry) return;
+    const k = DB.klassen.find(x => x.id === entry.kid);
+    if (k){ const l = k.leistungen.find(x => x.id === entry.lid); if (l && !Object.keys(l.werte).length) k.leistungen = k.leistungen.filter(x => x !== l); }
+    entry = null; saveDB();
+    if (!silent) renderBuch();
+  }
+  const defKats = (stufe) => [
+    {id:uid(), name: stufe === 'kurs' ? 'Klausuren' : 'Klassenarbeiten', w:1, typ:'punkte'},
+    {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
+  const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
+    ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
+  const katTyp = c => c && c.typ === 'note' ? 'note' : 'punkte';
+  const wSum = kats => kats.reduce((a, c) => a + (+c.w || 0), 0);
+  const wPct = (kats, c) => { const t = wSum(kats); return t > 0 ? (+c.w || 0) / t * 100 : 100 / kats.length; };
+  const ratioText = kats => kats.map(c => num(+c.w || 0)).join(' : ');
+  const stufeName = s => s === 'kurs' ? 'Kursstufe' : 'Mittelstufe';
+  const badge = s => '<span class="badge ' + (s === 'kurs' ? 'kurs' : '') + '">' + stufeName(s) + '</span>';
+
+  function parseGrade(stufe, s){
+    if (stufe === 'kurs'){
+      if (/^\d{1,2}$/.test(s) && +s <= 15) return +s;
+      return null;
+    }
+    let m;
+    if ((m = s.match(/^([1-5])[-\/]([2-6])$/)) && +m[2] === +m[1] + 1) return +m[1] + 0.5;
+    if ((m = s.match(/^([1-6])([+-])$/))){ const v = +m[1] + (m[2] === '+' ? -0.25 : 0.25); return v >= 1 && v <= 6 ? v : null; }
+    if (/^\d([.,]\d{1,2})?$/.test(s)){ const v = parseFloat(s.replace(',', '.')); return v >= 1 && v <= 6 ? v : null; }
+    return null;
+  }
+  const gradeLabel = (stufe, v) => stufe === 'kurs' ? String(v).padStart(2, '0') : mLabel(v, 'viertel');
+  const fmtAvg = x => x == null ? '–' : num(x, 2);
+
+  /* ---------- Smileys (1 = lachend/dunkelgrün … 6 = weinend/rot) ---------- */
+  const SM_FARBE = {1:'#1e7b34', 2:'#7bc043', 3:'#f4c430', 4:'#fbb26a', 5:'#e8731a', 6:'#d7263d'};
+  const faceOf = (stufe, v) => stufe === 'kurs' ? (v === 0 ? 6 : 5 - Math.floor((v - 1) / 3)) : Math.min(6, Math.max(1, Math.round(v)));
+  const gradeColors = (stufe, v) => { const f = faceOf(stufe, v); return {bg: SM_FARBE[f], fg: (f === 1 || f === 5 || f === 6) ? '#fff' : '#1f2328'}; };
+  const gradePill = (stufe, v, label, extra) => { const c = gradeColors(stufe, v); return '<span class="gpill" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(label) + (extra || '') + '</span>'; };
+  function smiley(f, px){
+    const ink = f === 1 ? '#ffffff' : '#1f2328';
+    // Mundkrümmung: positiv = lächeln, negativ = traurig
+    const curve = {1:0, 2:7, 3:3, 4:-2, 5:-6, 6:-8}[f];
+    let mouth;
+    if (f === 1) mouth = '<path d="M10 20.5 Q20 33 30 20.5 Z" fill="#7a1f1f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 25.2 Q20 29.5 26 25.2 Q20 23.6 14 25.2 Z" fill="#ff8f8f"/>';
+    else if (f === 3) mouth = '<path d="M12 25.5 Q20 ' + (25.5 + curve) + ' 28 25.5" fill="none" stroke="' + ink + '" stroke-width="2.4" stroke-linecap="round"/>';
+    else mouth = '<path d="M12 ' + (curve > 0 ? 23.5 : 28) + ' Q20 ' + ((curve > 0 ? 23.5 : 28) + curve) + ' 28 ' + (curve > 0 ? 23.5 : 28) + '" fill="none" stroke="' + ink + '" stroke-width="2.4" stroke-linecap="round"/>';
+    let eyes;
+    if (f === 1) eyes = '<path d="M11.5 16 Q14.5 12 17.5 16 M22.5 16 Q25.5 12 28.5 16" fill="none" stroke="' + ink + '" stroke-width="2.3" stroke-linecap="round"/>';
+    else if (f === 6) eyes = '<path d="M11.5 14.5 Q14.5 17.5 17.5 14.5 M22.5 14.5 Q25.5 17.5 28.5 14.5" fill="none" stroke="' + ink + '" stroke-width="2.3" stroke-linecap="round"/>';
+    else eyes = '<circle cx="14.5" cy="15.5" r="2.3" fill="' + ink + '"/><circle cx="25.5" cy="15.5" r="2.3" fill="' + ink + '"/>';
+    let extra = '';
+    if (f === 5) extra = '<path d="M11 12.5 L17 10 M29 12.5 L23 10" stroke="' + ink + '" stroke-width="1.8" stroke-linecap="round"/>';
+    if (f === 6) extra = '<path d="M13 18.5 Q10.5 23 13 25 Q15.5 23 13 18.5 Z M27 18.5 Q24.5 23 27 25 Q29.5 23 27 18.5 Z" fill="#4aa3f0" stroke="#2a7fd0" stroke-width=".6"/>';
+    return '<svg class="smiley" width="' + px + '" height="' + px + '" viewBox="0 0 40 40" aria-label="Note ' + f + '">' +
+      '<circle cx="20" cy="20" r="18.5" fill="' + SM_FARBE[f] + '" stroke="rgba(0,0,0,.25)" stroke-width="1"/>' + eyes + mouth + extra + '</svg>';
+  }
+
+  const keyCache = new Map();
+  const getR = (l, stufe) => { if (!keyCache.has(l.id)) keyCache.set(l.id, compute(stufe, l.key)); return keyCache.get(l.id); };
+
+  function cellVal(k, l, sid){
+    const s = String(l.werte[sid] ?? '').trim().replace(/\s+/g, '');
+    if (s === '') return {state:'empty'};
+    if (/^(-|–|x|f|fehlt|a|att|attest)$/i.test(s)) return {state:'skip'};
+    if (l.typ === 'punkte'){
+      const R = getR(l, k.stufe);
+      if (!/^\d+([.,]\d+)?$/.test(s)) return {state:'bad'};
+      const p = parseFloat(s.replace(',', '.'));
+      if (p > R.total + 1e-9) return {state:'bad'};
+      const {g} = gradeFor(R, p);
+      return {state:'ok', v:g.v, label:g.label, pts:p};
+    }
+    const v = parseGrade(k.stufe, s);
+    return v == null ? {state:'bad'} : {state:'ok', v, label:gradeLabel(k.stufe, v)};
+  }
+
+  const isNoteKat = c => katTyp(c) === 'note';
+  // Ältere Einträge ohne Nummer gehören zu Nummer 1
+  // Einträge einer Kategorie in die andere Art umwandeln
+  function convertKat(k, c, typ){
+    k.leistungen.filter(l => l.kat === c.id).forEach(l => {
+      if (typ === 'note'){ l.typ = 'note'; if (!(+l.gruppe >= 1)) l.gruppe = 1; }
+      else { l.typ = 'punkte'; if (!l.key) l.key = copy(S[k.stufe]); delete l.gruppe; }
+    });
+    c.typ = typ;
+  }
+  const ORAL = /m(ü|ue)ndl|sonstig|mitarbeit|prakt|referat|pr(ä|ae)sentation|hausaufg|heft|projekt|portfolio|epoche/i;
+  function normalize(k){
+    let changed = false;
+    k.kats.forEach(c => {
+      if (c.typ === 'note' || c.typ === 'punkte') return;
+      // Kategorie aus älterer Version ohne festgelegte Art
+      const L = k.leistungen.filter(l => l.kat === c.id);
+      const allGrades = L.every(l => Object.values(l.werte).every(v => { const t = String(v).trim(); return t === '' || /^(-|–|x|f|fehlt|a|att|attest)$/i.test(t) || parseGrade(k.stufe, t) != null; }));
+      const looksOral = ORAL.test(c.name) || (L.length && L.every(l => l.typ === 'note'));
+      if (looksOral && allGrades) convertKat(k, c, 'note'); else c.typ = 'punkte';
+      changed = true;
+    });
+    if (changed) saveDB();
+    k.leistungen.forEach(l => {
+      const c = k.kats.find(x => x.id === l.kat);
+      if (c && isNoteKat(c) && !(+l.gruppe >= 1)) l.gruppe = 1;
+    });
+  }
+  // Nummern (z. B. mündliche Note 1, 2, …) einer Noten-Kategorie mit ihren Terminen
+  function groupsOf(k, c){
+    const m = new Map();
+    k.leistungen.filter(l => l.kat === c.id).forEach(l => { const g = +l.gruppe || 1; if (!m.has(g)) m.set(g, []); m.get(g).push(l); });
+    return [...m.entries()].sort((a, b) => a[0] - b[0])
+      .map(([nr, ls]) => ({nr, ls: ls.sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))}));
+  }
+  const rangeText = ls => {
+    const ds = ls.map(l => l.datum).filter(Boolean).sort();
+    if (!ds.length) return '';
+    const a = ds[0], b = ds[ds.length - 1];
+    return a === b ? fmtDate(a) : a.slice(8, 10) + '.' + a.slice(5, 7) + '.–' + fmtDate(b);
+  };
+  const wmean = (k, ls, sid) => {
+    let sw = 0, sum = 0;
+    ls.forEach(l => { const x = cellVal(k, l, sid), g = +l.gew; if (x.state === 'ok' && g > 0){ sum += x.v * g; sw += g; } });
+    return sw ? sum / sw : null;
+  };
+
+  function stats(k, sid){
+    const cat = {}, grp = {};
+    for (const c of k.kats){
+      if (isNoteKat(c)){
+        const avgs = [];
+        groupsOf(k, c).forEach(g => { const a = wmean(k, g.ls, sid); grp[c.id + ':' + g.nr] = a; if (a != null) avgs.push(a); });
+        cat[c.id] = avgs.length ? avgs.reduce((x, y) => x + y, 0) / avgs.length : null;
+      } else cat[c.id] = wmean(k, k.leistungen.filter(l => l.kat === c.id), sid);
+    }
+    let tw = 0, t = 0; const present = [];
+    for (const c of k.kats) if (cat[c.id] != null){ present.push(cat[c.id]); tw += +c.w || 0; t += cat[c.id] * (+c.w || 0); }
+    const total = !present.length ? null : tw > 0 ? t / tw : present.reduce((a, b) => a + b, 0) / present.length;
+    return {cat, grp, total};
+  }
+
+  const sortedCols = k => {
+    const cols = [];
+    k.kats.filter(c => !isNoteKat(c)).forEach(c => k.leistungen.filter(l => l.kat === c.id)
+      .sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))
+      .forEach(l => cols.push(l)));
+    return cols;
+  };
+
+  /* ============================================================
+     Notenbuch – Darstellung
+     ============================================================ */
+  function renderBuch(){
+    $('klassenListe').innerHTML = DB.klassen.length
+      ? DB.klassen.map(k => '<li data-kid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span>' + esc(k.name) + '</span>' + badge(k.stufe) + '</li>').join('')
+      : '<li class="empty">Noch keine Klassen angelegt.</li>';
+
+    if (entry && entry.kid !== DB.aktiv) finishEntry(true);
+    const k = aktKlasse(), main = $('buchMain');
+    keyCache.clear();
+    if (!k){
+      main.innerHTML = '<div class="emptystate"><h2>Willkommen im Notenbuch</h2><p>Lege zuerst eine Klasse (Mittelstufe, Noten 1–6) oder einen Kurs (Kursstufe, 0–15 VP) an.</p><button class="btn primary" data-act="neueKlasse" type="button">+ Klasse / Kurs anlegen</button></div>';
+      return;
+    }
+    normalize(k);
+    const cols = sortedCols(k);
+    const byKat = c => cols.filter(l => l.kat === c.id);
+    const G = {}; k.kats.forEach(c => { if (isNoteKat(c)) G[c.id] = groupsOf(k, c); });
+    const width = c => isNoteKat(c) ? Math.max(G[c.id].reduce((a, g) => a + g.ls.length + 1, 0), 1) : Math.max(byKat(c).length, 1);
+    const eL = entryL();
+    let h = '<div class="buchhead"><div><h2>' + esc(k.name) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
+      k.schueler.length + ' Schüler·innen · Gewichtung ' +
+      k.kats.map(c => esc(c.name)).join(' : ') + ' = ' + ratioText(k.kats) +
+      (k.kats.length > 1 ? ' (' + k.kats.map(c => num(wPct(k.kats, c), 1) + ' %').join(' / ') + ')' : '') + '</div></div>' +
+      '<div class="toolbar"><button class="btn primary" data-act="leistung" type="button">+ Arbeit / Test</button>' +
+      '<button class="btn" data-act="kategorie" type="button">+ Kategorie</button>' +
+      '<button class="btn" data-act="schueler" type="button">+ Schüler·innen</button>' +
+      '<button class="btn" data-act="sort" type="button">A–Z sortieren</button>' +
+      '<button class="btn" data-act="klasse" type="button">Einstellungen</button>' +
+      '<button class="btn" data-act="csv" type="button">CSV</button>' +
+      '<button class="btn" data-act="print" type="button">Drucken</button></div></div>';
+    if (eL){
+      const ec = k.kats.find(x => x.id === eL.kat) || {name:''};
+      h += '<div class="entrybar noprint"><b>' + esc(ec.name) + ' ' + eL.gruppe + '</b><span>Termin am</span>' +
+        '<input type="date" id="eDatum" value="' + esc(eL.datum) + '">' +
+        '<span class="hint" style="margin:0;flex:1">In der markierten Spalte für jede Person einen Smiley anklicken – nochmal klicken entfernt die Note.</span>' +
+        '<button class="btn" type="button" data-act="entryCancel">' + (entry && entry.neu ? 'Verwerfen' : 'Termin löschen') + '</button><button class="btn primary" type="button" data-act="entryDone">Fertig</button></div>';
+    }
+    const ecls = l => eL === l ? ' entrycol' : '';
+
+    // Kopfzeile 1: Kategorien
+    h += '<div class="tablewrap"><table class="gb"><thead><tr><th rowspan="3" class="nr">Nr.</th><th rowspan="3" class="name">Name</th>';
+    k.kats.forEach(c => {
+      h += '<th colspan="' + (width(c) + 1) + '" class="cat catstart" data-kat="' + c.id + '" title="Kategorie bearbeiten">' +
+        '<span class="cn">' + esc(c.name) + '</span><span class="cw">' + num(wPct(k.kats, c), 1) + ' %</span>' +
+        '<button type="button" class="catadd noprint" data-addkat="' + c.id + '" title="' + (isNoteKat(c) ? 'Neue Nummer / neue Noten' : 'Neue Arbeit / neuer Test') + '">+</button></th>';
+    });
+    h += '<th rowspan="3" class="avgcol">Ø Gesamt</th><th rowspan="3">Zeugnis</th></tr><tr>';
+    // Kopfzeile 2: Arbeiten bzw. Nummern
+    k.kats.forEach(c => {
+      if (isNoteKat(c)){
+        if (!G[c.id].length) h += '<th rowspan="2" class="emptycat catstart">noch keine Noten – „+“ klicken</th>';
+        G[c.id].forEach((g, i) => h += '<th colspan="' + (g.ls.length + 1) + '" class="gh' + (i === 0 ? ' catstart' : ' gstart') + '">' +
+          '<span class="gnr" data-grp="' + c.id + ':' + g.nr + '" title="Termine von ' + esc(c.name) + ' ' + g.nr + ' anzeigen">' + g.nr + '</span>' +
+          '<button type="button" class="grpadd noprint" data-addgrp="' + c.id + ':' + g.nr + '" title="Weitere Noten zu ' + g.nr + ' hinzufügen">+</button>' +
+          '<small>' + rangeText(g.ls) + '</small></th>');
+      } else {
+        const L = byKat(c);
+        if (!L.length) h += '<th rowspan="2" class="emptycat catstart">noch keine Einträge – „+“ klicken</th>';
+        L.forEach((l, i) => h += '<th rowspan="2" class="lh' + (i === 0 ? ' catstart' : '') + '" data-lid="' + l.id + '" title="Eintrag bearbeiten">' + esc(l.name) +
+          '<small>' + fmtDate(l.datum) + (+l.gew !== 1 ? ' · ×' + num(l.gew) : '') + '<br>' + (modusOf(l) === 'note' ? 'Note' : 'max. ' + num(l.key.total) + ' P' + (modusOf(l) === 'aufgaben' ? ' · ' + (l.aufgaben || []).length + ' Aufg.' : '')) + '</small>' +
+          (hasAusw(k, l) ? '<button type="button" class="auswbtn noprint" data-ausw="' + l.id + '" title="Auswertung nach Aufgaben">▮▮▯ Auswertung</button>' : '') + '</th>');
+      }
+      h += '<th rowspan="2" class="catavg">Ø<small>' + esc(c.name) + '</small></th>';
+    });
+    h += '</tr><tr>';
+    // Kopfzeile 3: Datum je Termin + Ø der Nummer
+    k.kats.forEach(c => {
+      if (!isNoteKat(c)) return;
+      G[c.id].forEach((g, i) => {
+        g.ls.forEach((l, j) => h += '<th class="dh' + (i === 0 && j === 0 ? ' catstart' : j === 0 ? ' gstart' : '') + ecls(l) + '" data-term="' + l.id + '" title="' + esc(l.name || 'Termin') + ' – klicken zum Bearbeiten">' +
+          (l.datum ? l.datum.slice(8, 10) + '.' + l.datum.slice(5, 7) + '.' : '–') + (+l.gew !== 1 ? '<small>×' + num(l.gew) + '</small>' : '') + '</th>');
+        h += '<th class="gavgh">Ø ' + g.nr + '</th>';
+      });
+    });
+    h += '</tr></thead><tbody>';
+    k.schueler.forEach((s, r) => {
+      h += '<tr><td class="nr">' + (r + 1) + '</td><td class="name" data-sid="' + s.id + '" title="Umbenennen / löschen">' + esc(s.name) + '</td>';
+      k.kats.forEach(c => {
+        if (isNoteKat(c)){
+          if (!G[c.id].length) h += '<td class="catstart"></td>';
+          G[c.id].forEach((g, i) => {
+            g.ls.forEach((l, j) => h += '<td class="tcell' + (i === 0 && j === 0 ? ' catstart' : j === 0 ? ' gstart' : '') + ecls(l) + '" data-term="' + l.id + '" id="tc-' + l.id + '-' + s.id + '"></td>');
+            h += '<td class="gavgc" id="ga-' + c.id + '-' + g.nr + '-' + s.id + '"></td>';
+          });
+        } else {
+          const L = byKat(c);
+          if (!L.length) h += '<td class="catstart"></td>';
+          L.forEach((l, i) => { const ro = modusOf(l) === 'aufgaben';
+            const nm = modusOf(l) === 'note';
+            h += '<td class="pc' + (i === 0 ? ' catstart' : '') + '"><span class="g" id="g-' + l.id + '-' + s.id + '"></span><input data-l="' + l.id + '" data-s="' + s.id + '" data-r="' + r + '" value="' + esc(l.werte[s.id] ?? '') +
+            '" inputmode="' + (nm ? 'text' : 'decimal') + '" autocomplete="off" class="' + (nm ? 'nm' : ro ? 'pt ro' : 'pt') + '"' + (ro ? ' readonly title="Summe der Aufgaben – klicken zum Bearbeiten"' : nm ? '' : ' title="Punkte"') + '></td>'; });
+        }
+        h += '<td class="catavg" id="a-' + c.id + '-' + s.id + '"></td>';
+      });
+      h += '<td class="avgcol tot" id="t-' + s.id + '"></td><td><input class="zeugnis" data-z="' + s.id + '" value="' + esc(s.zeugnis || '') + '" autocomplete="off"></td></tr>';
+    });
+    const ncols = 4 + k.kats.reduce((a, c) => a + width(c) + 1, 0);
+    if (!k.schueler.length) h += '<tr><td colspan="' + ncols + '" class="hintrow">Noch keine Schüler·innen – über „+ Schüler·innen“ eine Namensliste einfügen.</td></tr>';
+    h += '</tbody><tfoot><tr><td></td><td class="name">Klassenschnitt</td>';
+    k.kats.forEach(c => {
+      if (isNoteKat(c)){
+        if (!G[c.id].length) h += '<td class="catstart"></td>';
+        G[c.id].forEach((g, i) => {
+          g.ls.forEach((l, j) => h += '<td id="f-' + l.id + '" class="' + (i === 0 && j === 0 ? 'catstart' : j === 0 ? 'gstart' : '') + '"></td>');
+          h += '<td class="gavgc" id="gf-' + c.id + '-' + g.nr + '"></td>';
+        });
+      } else {
+        const L = byKat(c);
+        if (!L.length) h += '<td class="catstart"></td>';
+        L.forEach((l, i) => h += '<td id="f-' + l.id + '"' + (i === 0 ? ' class="catstart"' : '') + '></td>');
+      }
+      h += '<td class="catavg" id="fa-' + c.id + '"></td>';
+    });
+    h += '<td class="avgcol tot" id="ft"></td><td></td></tr></tfoot></table></div>';
+    h += '<p class="hint noprint"><b>Arbeiten/Tests:</b> Punkte direkt eintragen, Enter bzw. ↑/↓ wechselt die Zeile. ' +
+      '<b>Mündlich u. Ä.:</b> „+“ neben der Nummer klicken – eine neue Spalte mit dem heutigen Datum erscheint, und bei allen Schüler·innen stehen die Smileys zur Auswahl. ' +
+      'Ein Feld einer bestehenden Datumsspalte anklicken, um dort Noten zu ändern. Neue Nummer über „+“ neben „Mündlich“. Namen anklicken zum Umbenennen oder Löschen.</p>';
+    main.innerHTML = h;
+    refreshDerived();
+  }
+
+  function refreshDerived(){
+    const k = aktKlasse(); if (!k) return;
+    const colVals = {}, catVals = {}, grpVals = {}, totVals = [];
+    const setT = (id, t) => { const el = $(id); if (el) el.textContent = t; };
+    const noteKats = k.kats.filter(isNoteKat), G = {};
+    noteKats.forEach(c => G[c.id] = groupsOf(k, c));
+    const eL = entryL();
+    k.schueler.forEach(s => {
+      // Arbeiten/Tests mit Punkten
+      k.leistungen.forEach(l => {
+        const sp = $('g-' + l.id + '-' + s.id); if (!sp) return;
+        const x = cellVal(k, l, s.id);
+        const inp = sp.nextElementSibling;
+        if (l.typ === 'note'){
+          sp.innerHTML = ''; sp.style.display = 'none';
+          const cc = x.state === 'ok' ? gradeColors(k.stufe, x.v) : null;
+          inp.style.background = cc ? cc.bg : ''; inp.style.color = cc ? cc.fg : '';
+          inp.classList.toggle('nmok', !!cc);
+        } else { sp.style.display = ''; sp.innerHTML = x.state === 'ok' ? gradePill(k.stufe, x.v, x.label) : ''; }
+        inp.classList.toggle('bad', x.state === 'bad');
+        inp.classList.toggle('skip', x.state === 'skip');
+        if (!inp.classList.contains('ro')) inp.title = x.state === 'bad' ? (l.typ === 'note' ? 'Ungültige Note' : 'Ungültig: Punkte zwischen 0 und ' + num(getR(l, k.stufe).total)) : '';
+        if (x.state === 'ok') (colVals[l.id] = colVals[l.id] || []).push(x.v);
+      });
+      const st = stats(k, s.id);
+      // Noten-Kategorien: ein Smiley je Termin
+      noteKats.forEach(c => G[c.id].forEach(g => {
+        g.ls.forEach(l => {
+          const el = $('tc-' + l.id + '-' + s.id); if (!el) return;
+          const x = cellVal(k, l, s.id);
+          if (x.state === 'ok') (colVals[l.id] = colVals[l.id] || []).push(x.v);
+          if (l === eL){
+            const face = x.state === 'ok' ? faceOf(k.stufe, x.v) : null;
+            el.innerHTML = '<div class="epick">' + pickVals(k.stufe).map((pv, i) => '<button type="button" class="ep' + (face === i + 1 ? ' on' : '') +
+              '" data-epick="' + pv + '" data-face="' + (i + 1) + '" data-s="' + s.id + '" title="' + (k.stufe === 'kurs' ? pv + ' VP' : 'Note ' + pv) + '">' + smiley(i + 1, 24) + '</button>').join('') + '</div>';
+            el.title = '';
+          } else {
+            el.innerHTML = x.state === 'ok' ? '<span class="gsm">' + smiley(faceOf(k.stufe, x.v), 24) + '</span>'
+              : x.state === 'bad' ? '<span class="gsm badv">?</span>' : '';
+            el.title = (x.state === 'ok' ? 'Note ' + x.label + ' – ' : '') + 'klicken zum Bearbeiten dieses Termins';
+          }
+        });
+        const a = st.grp[c.id + ':' + g.nr];
+        setT('ga-' + c.id + '-' + g.nr + '-' + s.id, fmtAvg(a));
+        if (a != null) (grpVals[c.id + ':' + g.nr] = grpVals[c.id + ':' + g.nr] || []).push(a);
+      }));
+      k.kats.forEach(c => { setT('a-' + c.id + '-' + s.id, fmtAvg(st.cat[c.id])); if (st.cat[c.id] != null) (catVals[c.id] = catVals[c.id] || []).push(st.cat[c.id]); });
+      setT('t-' + s.id, fmtAvg(st.total)); if (st.total != null) totVals.push(st.total);
+    });
+    const mean = a => a && a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+    k.leistungen.forEach(l => { const el = $('f-' + l.id), a = colVals[l.id]; if (el) el.innerHTML = a ? fmtAvg(mean(a)) + ' <small>(' + a.length + ')</small>' : '–'; });
+    noteKats.forEach(c => G[c.id].forEach(g => setT('gf-' + c.id + '-' + g.nr, fmtAvg(mean(grpVals[c.id + ':' + g.nr])))));
+    k.kats.forEach(c => setT('fa-' + c.id, fmtAvg(mean(catVals[c.id]))));
+    setT('ft', fmtAvg(mean(totVals)));
+  }
+
+  /* ---------- Dialog ---------- */
+  const dlg = $('dlg');
+  function openDialog(title, html, buttons, wide){
+    dlg.classList.toggle('wide', !!wide); dlg.classList.remove('xwide');
+    dlg.innerHTML = '<form class="dlgform"><h2>' + esc(title) + '</h2><div class="dlgbody">' + html + '</div><div class="dlgbtns"></div></form>';
+    const bar = dlg.querySelector('.dlgbtns');
+    buttons.forEach(b => {
+      const el = document.createElement('button'); el.type = 'button'; el.className = 'btn ' + (b.cls || ''); el.textContent = b.label;
+      el.onclick = () => { if (b.onClick && b.onClick() === false) return; dlg.close(); };
+      bar.appendChild(el);
+    });
+    dlg.querySelector('form').addEventListener('submit', e => { e.preventDefault(); const p = bar.querySelector('.primary'); p && p.click(); });
+    dlg.showModal();
+    const first = dlg.querySelector('.dlgbody input[type=text], .dlgbody textarea'); first && first.focus();
+  }
+  const dq = sel => dlg.querySelector(sel);
+
+  function openKlasse(k){
+    const isNew = !k;
+    const d = k ? {name:k.name, stufe:k.stufe, kats:copy(k.kats)} : {name:'', stufe:'mittel', kats:defKats('mittel')};
+    const locked = !!(k && k.leistungen.length);
+    const html =
+      '<div class="field"><label>Name</label><input type="text" id="kName" value="' + esc(d.name) + '" placeholder="z. B. 7a Mathematik oder M1 (Kursstufe)"></div>' +
+      '<div class="field"><span class="lbl">Stufe</span><div class="seg">' +
+      '<label><input type="radio" name="kStufe" value="mittel" ' + (d.stufe === 'mittel' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Mittelstufe (1–6)</label>' +
+      '<label><input type="radio" name="kStufe" value="kurs" ' + (d.stufe === 'kurs' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Kursstufe (0–15 VP)</label></div>' +
+      (locked ? '<div class="hint">Die Stufe kann nicht mehr geändert werden, weil bereits Leistungen angelegt sind.</div>' : '') + '</div>' +
+      '<div class="field"><label for="kRatio">Gewichtung als Verhältnis</label>' +
+      '<input type="text" id="kRatio" value="' + esc(ratioText(d.kats)) + '" placeholder="z. B. 2:1, 4:5 oder 60:40">' +
+      '<div class="hint">Reihenfolge wie die Kategorien unten. Auch Dezimalzahlen sind möglich, z. B. 1,5:1.</div></div>' +
+      '<div class="field"><span class="lbl">Kategorien</span><div class="kathead"><span>Name</span><span>Eintragung</span><span>Gewicht</span><span>Anteil</span><span></span></div><div id="katList"></div>' +
+      '<button class="btn" type="button" id="katAdd">+ eigene Kategorie</button>' +
+      '<div class="chips">' + KAT_VORSCHLAEGE.map((v, i) => '<button type="button" class="chip" data-vor="' + i + '">+ ' + esc(v[0]) + '</button>').join('') + '</div>' +
+      '<div class="hint">Fehlt in einer Kategorie noch jede Note, zählen nur die übrigen Kategorien im gleichen Verhältnis zueinander.</div></div>';
+    const readKats = () => dlg.querySelectorAll('.katrow').forEach((row, i) => {
+      d.kats[i].name = row.querySelector('.kn').value.trim();
+      d.kats[i].w = parseFloat(String(row.querySelector('.kw').value).replace(',', '.')) || 0;
+      d.kats[i].typ = row.querySelector('.kt').value;
+    });
+    // fromRatio = true: Verhältnisfeld nicht überschreiben (Nutzer tippt gerade dort)
+    const renderKats = (fromRatio) => {
+      dq('#katList').innerHTML = d.kats.map((c, i) => '<div class="katrow"><input type="text" class="kn" value="' + esc(c.name) + '" placeholder="Kategorie">' +
+        '<select class="kt"' + (k && k.leistungen.some(l => l.kat === c.id) ? ' disabled title="Kategorie enthält bereits Einträge"' : '') + '><option value="punkte"' + (katTyp(c) === 'punkte' ? ' selected' : '') + '>Punkte</option><option value="note"' + (katTyp(c) === 'note' ? ' selected' : '') + '>Note</option></select>' +
+        '<input type="number" class="kw" min="0" step="any" value="' + c.w + '"><span class="kp"></span><button type="button" class="btn x" data-kdel="' + i + '" title="Entfernen">×</button></div>').join('');
+      updPct(fromRatio);
+    };
+    const updPct = (fromRatio) => {
+      readKats();
+      dlg.querySelectorAll('.katrow .kp').forEach((el, i) => el.textContent = num(wPct(d.kats, d.kats[i]), 1) + ' %');
+      if (!fromRatio){ const r = dq('#kRatio'); r.value = ratioText(d.kats); r.classList.remove('invalid'); r.title = ''; }
+    };
+    const applyRatio = () => {
+      const r = dq('#kRatio'), parts = r.value.trim().split(/\s*[:\/]\s*/).filter(x => x !== '');
+      const vals = parts.map(x => parseFloat(x.replace(',', '.')));
+      const ok = vals.length && vals.every(v => !isNaN(v) && v >= 0) && vals.some(v => v > 0);
+      r.title = '';
+      if (!ok){ r.classList.add('invalid'); return; }
+      readKats();
+      while (d.kats.length < vals.length) d.kats.push({id:uid(), name:'Kategorie ' + (d.kats.length + 1), w:0, typ:'note'});
+      const tooFew = vals.length < d.kats.length;
+      r.classList.toggle('invalid', tooFew);
+      if (tooFew) r.title = 'Bitte für jede der ' + d.kats.length + ' Kategorien einen Wert angeben.';
+      vals.forEach((v, i) => d.kats[i].w = v);
+      renderKats(true);
+    };
+    const buttons = [];
+    if (!isNew) buttons.push({label:'Klasse löschen', cls:'danger', onClick:() => {
+      if (!confirm('„' + k.name + '“ mit allen Schüler·innen und Noten endgültig löschen?')) return false;
+      DB.klassen = DB.klassen.filter(x => x !== k); DB.aktiv = DB.klassen[0] ? DB.klassen[0].id : null; saveDB(); renderBuch();
+    }});
+    buttons.push({label:'Abbrechen'});
+    buttons.push({label: isNew ? 'Anlegen' : 'Speichern', cls:'primary', onClick:() => {
+      readKats();
+      d.name = dq('#kName').value.trim();
+      if (!d.name){ dq('#kName').classList.add('invalid'); dq('#kName').focus(); return false; }
+      d.kats = d.kats.filter(c => c.name);
+      if (d.kats.length && !d.kats.some(c => +c.w > 0)){ alert('Mindestens eine Kategorie braucht ein Gewicht größer als 0.'); return false; }
+      if (!d.kats.length){ alert('Mindestens eine Kategorie ist nötig.'); d.kats = defKats(d.stufe); renderKats(); return false; }
+      const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value;
+      if (isNew){
+        const nk = {id:uid(), name:d.name, stufe:d.stufe, kats:d.kats, schueler:[], leistungen:[]};
+        DB.klassen.push(nk); DB.aktiv = nk.id;
+      } else {
+        k.name = d.name; if (!locked) k.stufe = d.stufe; k.kats = d.kats;
+        const ids = new Set(k.kats.map(c => c.id));
+        k.leistungen.forEach(l => { if (!ids.has(l.kat)) l.kat = k.kats[0].id; });
+      }
+      saveDB(); renderBuch();
+    }});
+    openDialog(isNew ? 'Neue Klasse / neuer Kurs' : 'Einstellungen: ' + k.name, html, buttons);
+    renderKats();
+    dq('#kRatio').addEventListener('input', applyRatio);
+    dq('#katList').addEventListener('input', e => { if (e.target.classList.contains('kw')) updPct(); });
+    dq('#katAdd').onclick = () => { readKats(); d.kats.push({id:uid(), name:'', w:1, typ:'note'}); renderKats(); dlg.querySelector('.katrow:last-child .kn').focus(); };
+    dlg.querySelector('.chips').addEventListener('click', e => {
+      const b = e.target.closest('[data-vor]'); if (!b) return;
+      const [name, typ] = KAT_VORSCHLAEGE[+b.dataset.vor];
+      readKats();
+      if (d.kats.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+      d.kats.push({id:uid(), name, w:1, typ}); renderKats();
+    });
+    if (isNew) dlg.querySelectorAll('input[name=kStufe]').forEach(r => r.addEventListener('change', () => {
+      readKats();
+      const first = d.kats[0];
+      if (first && (first.name === 'Klassenarbeiten' || first.name === 'Klausuren')) first.name = r.value === 'kurs' ? 'Klausuren' : 'Klassenarbeiten';
+      renderKats();
+    }));
+    dq('#katList').addEventListener('click', e => {
+      const b = e.target.closest('[data-kdel]'); if (!b) return;
+      readKats(); d.kats.splice(+b.dataset.kdel, 1); renderKats();
+    });
+  }
+
+  /* ---------- Noten-Kategorien: Nummer wählen ---------- */
+  function openNummerWahl(k, c){
+    const groups = groupsOf(k, c);
+    if (!groups.length) return startEntry(k, c, 1);
+    const next = groups[groups.length - 1].nr + 1;
+    const html = '<p class="hint" style="margin-top:0">Zu welcher Nummer gehören die neuen Noten?</p><div class="nrwahl">' +
+      groups.map(g => '<button type="button" class="nrbtn" data-nr="' + g.nr + '"><span class="gnr">' + g.nr + '</span><span>' + esc(c.name) + ' ' + g.nr +
+        '<small>' + g.ls.length + (g.ls.length === 1 ? ' Termin' : ' Termine') + (g.ls.length ? ' · ' + rangeText(g.ls) : '') + '</small></span></button>').join('') +
+      '<button type="button" class="nrbtn neu" data-nr="' + next + '"><span class="gnr">+</span><span>Neue Nummer ' + next + '<small>z. B. für den nächsten Abschnitt</small></span></button></div>';
+    openDialog(c.name + ' – Nummer wählen', html, [{label:'Abbrechen'}]);
+    dlg.querySelector('.nrwahl').addEventListener('click', e => {
+      const b = e.target.closest('[data-nr]'); if (!b) return;
+      dlg.close(); startEntry(k, c, +b.dataset.nr);
+    });
+  }
+
+  /* ---------- Übersicht einer Nummer mit ihren Terminen ---------- */
+  function openGruppe(k, c, nr){
+    const g = groupsOf(k, c).find(x => x.nr === nr); if (!g) return;
+    const rows = g.ls.map(l => {
+      let n = 0; const vs = [];
+      k.schueler.forEach(s => { const x = cellVal(k, l, s.id); if (x.state === 'ok'){ n++; vs.push(x.v); } });
+      return '<div class="trow"><span class="tdate">' + (fmtDate(l.datum) || '–') + '</span><span class="tname">' + esc(l.name || '') +
+        (+l.gew !== 1 ? ' <small>×' + num(l.gew) + '</small>' : '') + '</span><span class="tinfo">' + n + ' Noten' +
+        (vs.length ? ' · Ø ' + fmtAvg(vs.reduce((a, b) => a + b, 0) / vs.length) : '') + '</span>' +
+        '<button type="button" class="btn" data-edit="' + l.id + '">Bearbeiten</button></div>';
+    }).join('');
+    openDialog(c.name + ' ' + nr + ' · ' + k.name,
+      '<div class="hint" style="margin:-6px 0 10px">Zeitraum ' + (rangeText(g.ls) || '–') + '</div><div class="tlist">' + rows + '</div>',
+      [{label:'Nummer löschen', cls:'danger', onClick:() => {
+        if (!confirm(c.name + ' ' + nr + ' mit allen ' + g.ls.length + ' Termin(en) und Noten löschen?')) return false;
+        const ids = new Set(g.ls.map(l => l.id));
+        k.leistungen = k.leistungen.filter(l => !ids.has(l.id)); saveDB(); renderBuch();
+      }}, {label:'Schließen'}, {label:'+ Neuer Termin', cls:'primary', onClick:() => { setTimeout(() => startEntry(k, c, nr), 0); }}]);
+    dlg.querySelector('.tlist').addEventListener('click', e => {
+      const b = e.target.closest('[data-edit]'); if (!b) return;
+      dlg.close(); editEntry(k, k.leistungen.find(l => l.id === b.dataset.edit));
+    });
+  }
+
+  /* ---------- Schnelleingabe eines Termins (Smileys für alle Schüler·innen) ---------- */
+  function openSchnell(k, l, katId, nr){
+    const isNew = !l;
+    const kat = k.kats.find(c => c.id === (l ? l.kat : katId)) || k.kats[0];
+    const d = l ? copy(l) : {id:uid(), name:'', datum:today(), kat:kat.id, gruppe:nr || 1, gew:1, typ:'note', key:null, werte:{}};
+    d.typ = 'note'; d.gruppe = +d.gruppe || 1;
+    const nk = k.kats.filter(c => isNoteKat(c) || c.id === d.kat);
+    const vals = pickVals(k.stufe);
+    const rows = k.schueler.map(s => {
+      const v = d.werte[s.id] ?? '';
+      return '<div class="qrow" data-sid="' + s.id + '"><span class="qname">' + esc(s.name) + '</span><span class="qsm">' +
+        vals.map((pv, i) => '<button type="button" data-qv="' + pv + '" data-face="' + (i + 1) + '" title="' +
+          (k.stufe === 'kurs' ? pv + ' VP' : 'Note ' + pv) + '">' + smiley(i + 1, 30) + '</button>').join('') +
+        '</span><input type="text" class="qval" value="' + esc(v) + '" autocomplete="off" title="Note (auch z. B. 2-, 1-2)"><button type="button" class="qclr" title="Leeren">×</button></div>';
+    }).join('');
+    const html =
+      '<div class="grid3"><div class="field"><label>Datum</label><input type="date" id="qDatum" value="' + esc(d.datum) + '"></div>' +
+      '<div class="field"><label>Notiz (optional)</label><input type="text" id="qName" value="' + esc(d.name) + '" placeholder="z. B. Abfrage Kapitel 3"></div>' +
+      '<div class="field"><label>Gewicht</label><input type="number" id="qGew" min="0" step="0.5" value="' + d.gew + '"></div></div>' +
+      '<div class="grid2"><div class="field"><label>Kategorie</label><select id="qKat">' + nk.map(c => '<option value="' + c.id + '"' + (c.id === d.kat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label>Nummer</label><input type="number" id="qNr" min="1" step="1" value="' + d.gruppe + '"></div></div>' +
+      (k.schueler.length
+        ? '<div class="qlist">' + rows + '</div><div class="hint">Smiley anklicken, um die Note zu übernehmen; nochmal klicken entfernt sie. Feinere Noten (z. B. 2- oder 1-2) rechts eintippen.</div>'
+        : '<div class="warn">Diese Klasse hat noch keine Schüler·innen.</div>');
+    const markRow = row => {
+      const inp = row.querySelector('.qval'), s = inp.value.trim().replace(/\s+/g, '');
+      let face = null, bad = false;
+      if (s !== '' && !/^(-|–|x|f|fehlt|a|att|attest)$/i.test(s)){
+        const v = parseGrade(k.stufe, s);
+        if (v == null) bad = true; else face = faceOf(k.stufe, v);
+      }
+      inp.classList.toggle('invalid', bad);
+      row.querySelectorAll('[data-face]').forEach(b => b.classList.toggle('on', face === +b.dataset.face));
+      row.classList.toggle('has', face != null);
+    };
+    const commit = () => {
+      if (dlg.querySelector('.qval.invalid')){ alert('Bitte die rot markierten Noten korrigieren.'); return false; }
+      d.name = dq('#qName').value.trim(); d.datum = dq('#qDatum').value;
+      d.gew = Math.max(0, parseFloat(String(dq('#qGew').value).replace(',', '.')) || 0);
+      d.kat = dq('#qKat').value; d.gruppe = Math.max(1, parseInt(dq('#qNr').value, 10) || 1);
+      d.werte = {};
+      dlg.querySelectorAll('.qrow').forEach(row => { const v = row.querySelector('.qval').value.trim(); if (v) d.werte[row.dataset.sid] = v; });
+      if (isNew) k.leistungen.push(d); else Object.assign(l, d);
+      saveDB(); renderBuch(); return true;
+    };
+    const buttons = [];
+    if (!isNew) buttons.push({label:'Termin löschen', cls:'danger', onClick:() => {
+      if (!confirm('Termin vom ' + (fmtDate(l.datum) || '–') + ' mit allen Noten löschen?')) return false;
+      k.leistungen = k.leistungen.filter(x => x !== l); saveDB(); renderBuch();
+    }});
+    buttons.push({label:'Abbrechen'});
+    buttons.push({label:'Speichern', cls:'primary', onClick:commit});
+    openDialog(kat.name + ' ' + d.gruppe + ' – ' + (isNew ? 'neuer Termin' : 'Termin bearbeiten'), html, buttons, true);
+    dlg.querySelectorAll('.qrow').forEach(markRow);
+    const list = dlg.querySelector('.qlist');
+    if (list){
+      list.addEventListener('click', e => {
+        const row = e.target.closest('.qrow'); if (!row) return;
+        const inp = row.querySelector('.qval');
+        const b = e.target.closest('[data-qv]');
+        if (b) inp.value = b.classList.contains('on') && String(inp.value).trim() === b.dataset.qv ? '' : b.dataset.qv;
+        else if (e.target.closest('.qclr')) inp.value = '';
+        else return;
+        markRow(row);
+      });
+      list.addEventListener('input', e => { const row = e.target.closest('.qrow'); if (row) markRow(row); });
+    }
+    dq('#qDatum').focus();
+  }
+
+  function openKategorie(k, c){
+    const isNew = !c;
+    const d = c ? copy(c) : {id:uid(), name:'', w:1, typ:'note'};
+    const n = c ? k.leistungen.filter(l => l.kat === c.id).length : 0;
+    const html =
+      '<div class="field"><label>Name der Kategorie</label><input type="text" id="cName" value="' + esc(d.name) + '" placeholder="z. B. Mündlich, Tests, Praktische Note">' +
+      (isNew ? '<div class="chips">' + KAT_VORSCHLAEGE.filter(v => !k.kats.some(x => x.name.toLowerCase() === v[0].toLowerCase()))
+        .map(v => '<button type="button" class="chip" data-cv="' + esc(v[0]) + '" data-ct="' + v[1] + '">' + esc(v[0]) + '</button>').join('') + '</div>' : '') + '</div>' +
+      '<div class="grid2"><div class="field"><label>Gewicht</label><input type="number" id="cW" min="0" step="any" value="' + d.w + '">' +
+      '<div class="hint" id="cPct"></div></div>' +
+      '<div class="field"><span class="lbl">Art der Kategorie</span><div class="seg">' +
+      '<label title="Klassenarbeiten, Tests, Vokabeltests …"><input type="radio" name="cTyp" value="punkte"' + (katTyp(d) === 'punkte' ? ' checked' : '') + '>Punkte + Notenschlüssel</label>' +
+      '<label title="Mündlich, praktisch, Referate …"><input type="radio" name="cTyp" value="note"' + (katTyp(d) === 'note' ? ' checked' : '') + '>Noten direkt (Smileys)</label></div>' +
+      (n ? '<div class="hint">Beim Umstellen werden die vorhandenen Einträge umgewandelt; eingetragene Werte bleiben stehen.</div>' : '') + '</div></div>' +
+      (n ? '<div class="hint">' + n + ' Eintrag/Einträge in dieser Kategorie.</div>' : '');
+    const upd = () => {
+      const w = parseFloat(String(dq('#cW').value).replace(',', '.')) || 0;
+      const kats = isNew ? k.kats.concat([{w}]) : k.kats.map(x => x.id === d.id ? {w} : x);
+      const me = isNew ? kats[kats.length - 1] : kats[k.kats.findIndex(x => x.id === d.id)];
+      dq('#cPct').textContent = 'Verhältnis ' + ratioText(kats) + ' → Anteil ' + num(wPct(kats, me), 1) + ' %';
+    };
+    const buttons = [];
+    if (!isNew) buttons.push({label:'Kategorie löschen', cls:'danger', onClick:() => {
+      if (k.kats.length < 2){ alert('Die letzte Kategorie kann nicht gelöscht werden.'); return false; }
+      if (!confirm('Kategorie „' + c.name + '“' + (n ? ' mit ' + n + ' Eintrag/Einträgen und allen Noten darin' : '') + ' löschen?')) return false;
+      k.kats = k.kats.filter(x => x.id !== c.id);
+      k.leistungen = k.leistungen.filter(l => l.kat !== c.id);
+      saveDB(); renderBuch();
+    }});
+    buttons.push({label:'Abbrechen'});
+    buttons.push({label: isNew ? 'Anlegen' : 'Speichern', cls:'primary', onClick:() => {
+      d.name = dq('#cName').value.trim();
+      if (!d.name){ dq('#cName').classList.add('invalid'); dq('#cName').focus(); return false; }
+      d.w = Math.max(0, parseFloat(String(dq('#cW').value).replace(',', '.')) || 0);
+      d.typ = dlg.querySelector('input[name=cTyp]:checked').value;
+      const others = k.kats.filter(x => x.id !== d.id);
+      if (d.w <= 0 && !others.some(x => +x.w > 0)){ alert('Mindestens eine Kategorie braucht ein Gewicht größer als 0.'); return false; }
+      if (!isNew && n && katTyp(c) !== d.typ){
+        if (!confirm(d.typ === 'note'
+          ? 'Die ' + n + ' Einträge werden zu direkten Noten (Smileys) unter Nummer 1. Eingetragene Werte werden als Noten gelesen – Punktwerte erscheinen danach rot. Fortfahren?'
+          : 'Die ' + n + ' Einträge werden zu Arbeiten/Tests mit Punkten und Notenschlüssel. Eingetragene Werte werden als Punkte gelesen. Fortfahren?')) return false;
+        convertKat(k, c, d.typ);
+      }
+      if (isNew) k.kats.push(d); else Object.assign(c, d);
+      saveDB(); renderBuch();
+    }});
+    openDialog(isNew ? 'Neue Kategorie – ' + k.name : 'Kategorie bearbeiten', html, buttons);
+    upd();
+    dq('#cW').addEventListener('input', upd);
+    const chips = dlg.querySelector('.chips');
+    if (chips) chips.addEventListener('click', e => {
+      const b = e.target.closest('[data-cv]'); if (!b) return;
+      dq('#cName').value = b.dataset.cv;
+      dlg.querySelector('input[name=cTyp][value=' + b.dataset.ct + ']').checked = true;
+    });
+  }
+
+  function openAddSchueler(k){
+    openDialog('Schüler·innen hinzufügen – ' + k.name,
+      '<div class="field"><label>Namen (einer pro Zeile)</label><textarea id="sList" rows="10" placeholder="Müller, Anna&#10;Schmidt, Ben&#10;…"></textarea>' +
+      '<div class="hint">Eine Namensliste kann direkt aus einer Tabelle oder Liste eingefügt werden.</div></div>',
+      [{label:'Abbrechen'}, {label:'Hinzufügen', cls:'primary', onClick:() => {
+        const names = dq('#sList').value.split(/\r?\n/).map(x => x.replace(/\t/g, ' ').trim()).filter(Boolean);
+        names.forEach(n => k.schueler.push({id:uid(), name:n, zeugnis:''}));
+        saveDB(); renderBuch();
+      }}]);
+  }
+
+  function openSchueler(k, s){
+    openDialog('Schüler·in bearbeiten',
+      '<div class="field"><label>Name</label><input type="text" id="sName" value="' + esc(s.name) + '"></div>',
+      [{label:'Löschen', cls:'danger', onClick:() => {
+        if (!confirm('„' + s.name + '“ mit allen Noten aus ' + k.name + ' löschen?')) return false;
+        k.schueler = k.schueler.filter(x => x !== s);
+        k.leistungen.forEach(l => delete l.werte[s.id]);
+        saveDB(); renderBuch();
+      }}, {label:'Abbrechen'}, {label:'Speichern', cls:'primary', onClick:() => {
+        const n = dq('#sName').value.trim(); if (!n) return false;
+        s.name = n; saveDB(); renderBuch();
+      }}]);
+  }
+
+  /* ---------- Klassenarbeiten / Tests: drei Arten der Eintragung ---------- */
+  const MODI = {
+    note:     {t:'Note direkt eintragen', d:'Noten direkt in die Tabelle tippen (z. B. 2-, 3+, 2-3).'},
+    gesamt:   {t:'Gesamtpunktzahl eintragen', d:'Eingabefenster mit allen Schüler·innen; die Note ergibt sich aus dem Notenschlüssel.'},
+    aufgaben: {t:'Punkte für die Aufgaben eintragen', d:'Eingabefenster mit allen Schüler·innen und Aufgaben; Summe, Note und Auswertung je Aufgabe.'}
+  };
+  const modusOf = l => l.modus || (l.typ === 'note' ? 'note' : 'gesamt');
+
+  // opts: {key, kat, werte, aufgaben, ap}
+  function openLeistung(k, l, presetKey, presetKat, presetWerte, presetAufg){
+    const isNew = !l;
+    const pk = k.kats.filter(c => katTyp(c) === 'punkte');
+    if (!pk.length && isNew){ alert('Diese Klasse hat noch keine Kategorie für Arbeiten/Tests. Lege sie über „+ Kategorie“ an (Art: Punkte + Notenschlüssel).'); return; }
+    const katOf = id => pk.find(c => c.id === id) || pk[0];
+    const defName = c => c.name.replace(/en$|s$/,'') + ' ' + (k.leistungen.filter(x => x.kat === c.id).length + 1);
+    const startKat = l ? (k.kats.find(c => c.id === l.kat) || pk[0]) : katOf(presetKat);
+    const d = l ? copy(l) : {id:uid(), name:defName(startKat), datum:today(), kat:startKat.id, gew:1,
+      modus: presetAufg ? 'aufgaben' : presetWerte ? 'gesamt' : (presetKey ? 'gesamt' : 'gesamt'),
+      typ:'punkte', key: presetKey || copy(S[k.stufe]), werte: presetWerte ? copy(presetWerte) : {}};
+    d.modus = modusOf(d);
+    if (!d.key) d.key = copy(S[k.stufe]);
+    if (presetAufg){ d.aufgaben = copy(presetAufg.tasks); d.ap = copy(presetAufg.ap || {}); }
+    if (!Array.isArray(d.aufgaben) || !d.aufgaben.length) d.aufgaben = [1, 2, 3].map(i => ({id:uid(), name:'A' + i, max:0}));
+    const origModus = isNew ? null : modusOf(l);
+    const katList = pk.some(c => c.id === d.kat) ? pk : pk.concat(k.kats.filter(c => c.id === d.kat));
+    let nameTouched = !isNew;
+    const html =
+      '<div class="field"><label>Bezeichnung</label><input type="text" id="lName" value="' + esc(d.name) + '" placeholder="z. B. Klassenarbeit 1, Vokabeltest 3"></div>' +
+      '<div class="grid3"><div class="field"><label>Datum</label><input type="date" id="lDatum" value="' + esc(d.datum) + '"></div>' +
+      '<div class="field"><label>Kategorie</label><select id="lKat">' + katList.map(c => '<option value="' + c.id + '"' + (c.id === d.kat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label>Gewicht</label><input type="number" id="lGew" min="0" step="0.5" value="' + d.gew + '"></div></div>' +
+      '<div class="field"><span class="lbl">Wie soll eingetragen werden?</span><div class="modi">' +
+      Object.entries(MODI).map(([m, o]) => '<label class="modus"><input type="radio" name="lModus" value="' + m + '"' + (d.modus === m ? ' checked' : '') + '><span><b>' + o.t + '</b><small>' + o.d + '</small></span></label>').join('') +
+      '</div></div><div id="lAufg"></div><div id="lKey"></div>';
+    const modus = () => dlg.querySelector('input[name=lModus]:checked').value;
+    const readAufg = () => dlg.querySelectorAll('.lat').forEach((row, i) => {
+      d.aufgaben[i].name = row.querySelector('.an').value.trim() || 'A' + (i + 1);
+      const v = parseFloat(String(row.querySelector('.am').value).replace(',', '.')); d.aufgaben[i].max = isNaN(v) || v < 0 ? 0 : v;
+    });
+    const aufgSum = () => d.aufgaben.reduce((a, t) => a + (+t.max || 0), 0);
+    const readForm = () => {
+      d.name = dq('#lName').value.trim(); d.datum = dq('#lDatum').value;
+      d.gew = Math.max(0, parseFloat(String(dq('#lGew').value).replace(',', '.')) || 0);
+      d.kat = dq('#lKat').value; d.modus = modus(); d.typ = d.modus === 'note' ? 'note' : 'punkte';
+      if (d.modus === 'aufgaben'){ readAufg(); if (aufgSum() > 0) d.key.total = aufgSum(); }
+    };
+    const commit = () => {
+      readForm();
+      if (!d.name){ dq('#lName').classList.add('invalid'); dq('#lName').focus(); return false; }
+      if (d.modus === 'aufgaben' && !(aufgSum() > 0)){ alert('Bitte für die Aufgaben Maximalpunkte eintragen.'); return false; }
+      if (!isNew && origModus !== d.modus && Object.keys(l.werte).length &&
+          !confirm('Die Art der Eintragung wird geändert. Bereits eingetragene Werte bleiben stehen' +
+            (d.modus === 'note' ? ', werden aber nun als Noten gelesen.' : d.modus === 'aufgaben' ? ' und werden beim nächsten Speichern im Eingabefenster durch die Aufgabensummen ersetzt.' : ' und werden als Punkte gelesen.') + ' Fortfahren?')) return false;
+      if (d.modus === 'aufgaben'){ // Summen aktualisieren
+        const ids = new Set(d.aufgaben.map(t => t.id));
+        Object.values(d.ap || {}).forEach(p => Object.keys(p).forEach(tid => { if (!ids.has(tid)) delete p[tid]; }));
+        Object.entries(d.ap || {}).forEach(([sid, p]) => { const vals = Object.values(p).map(v => parseFloat(String(v).replace(',', '.'))).filter(v => !isNaN(v)); if (vals.length) d.werte[sid] = String(Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100); });
+      }
+      if (isNew) k.leistungen.push(d); else Object.assign(l, d);
+      saveDB(); renderBuch(); return true;
+    };
+    const renderAufgDef = () => {
+      const box = dq('#lAufg');
+      if (modus() !== 'aufgaben'){ box.innerHTML = ''; return; }
+      box.innerHTML = '<div class="field"><span class="lbl">Aufgaben und Maximalpunkte</span><div class="adef">' +
+        d.aufgaben.map((t, i) => '<div class="atask lat"><input type="text" class="an" value="' + esc(t.name) + '"><input type="number" class="am" min="0" step="0.5" value="' + (t.max || '') + '" placeholder="P"><span>P</span></div>').join('') +
+        '<button type="button" class="btn" id="laAdd">+</button>' + (d.aufgaben.length > 1 ? '<button type="button" class="btn" id="laDel">−</button>' : '') + '</div>' +
+        '<div class="hint" id="laSum"></div></div>';
+      const upd = () => { readAufg(); dq('#laSum').textContent = 'Summe: ' + num(aufgSum()) + ' Punkte – wird als Gesamtpunktzahl des Notenschlüssels verwendet.'; d.key.total = aufgSum() || d.key.total; renderKey(); };
+      box.querySelectorAll('input').forEach(i => i.addEventListener('input', upd));
+      dq('#laAdd').onclick = () => { readAufg(); d.aufgaben.push({id:uid(), name:'A' + (d.aufgaben.length + 1), max:0}); renderAufgDef(); };
+      if (dq('#laDel')) dq('#laDel').onclick = () => { readAufg(); d.aufgaben.pop(); renderAufgDef(); };
+      upd();
+    };
+    const renderKey = () => {
+      const box = dq('#lKey');
+      if (modus() === 'note'){ box.innerHTML = ''; return; }
+      const R = compute(k.stufe, d.key);
+      box.innerHTML = '<div class="keybox"><div class="keysum">Notenschlüssel: ' + keySummary(k.stufe, d.key) + '</div>' +
+        '<div class="keymini">' + R.rows.filter(r => !r.na && !r.fail).map(r => '<span><b>' + r.g.label + '</b> ab ' + num(r.from) + '</span>').join('') + '</div>' +
+        '<div class="row" style="flex-wrap:wrap"><button type="button" class="btn" id="kFromR">Aktuellen Schlüssel aus dem Rechner übernehmen</button>' +
+        '<button type="button" class="btn" id="kEdit">Im Rechner bearbeiten →</button></div></div>';
+      dq('#kFromR').onclick = () => { const t = d.key.total; d.key = copy(S[k.stufe]); if (modus() === 'aufgaben' && aufgSum() > 0) d.key.total = aufgSum(); else if (!isNew) d.key.total = d.key.total || t; renderKey(); };
+      dq('#kEdit').onclick = () => { if (commit() === false) return; dlg.close(); startLink(k, k.leistungen.find(x => x.id === d.id)); };
+    };
+    const buttons = [];
+    if (!isNew) buttons.push({label:'Löschen', cls:'danger', onClick:() => {
+      if (!confirm('„' + l.name + '“ mit allen eingetragenen Werten löschen?')) return false;
+      k.leistungen = k.leistungen.filter(x => x !== l); saveDB(); renderBuch();
+    }});
+    if (!isNew && hasAusw(k, l)) buttons.push({label:'Auswertung', onClick:() => { if (commit() === false) return false; const t = k.leistungen.find(x => x.id === d.id); setTimeout(() => openAuswertung(k, t), 0); }});
+    buttons.push({label:'Abbrechen'});
+    buttons.push({label:'Speichern', cls: '', onClick:commit});
+    buttons.push({label:'Weiter: Noten / Punkte eintragen →', cls:'primary', onClick:() => {
+      if (commit() === false) return false;
+      const target = k.leistungen.find(x => x.id === d.id);
+      if (modusOf(target) === 'note') setTimeout(() => { const inp = document.querySelector('input[data-l="' + target.id + '"]'); if (inp){ inp.focus(); inp.scrollIntoView({block:'nearest', inline:'center'}); } }, 0);
+      else setTimeout(() => openPunkte(k, target), 0);
+    }});
+    openDialog(isNew ? 'Neue Arbeit / neuer Test – ' + k.name : 'Arbeit / Test bearbeiten', html, buttons, true);
+    renderAufgDef(); renderKey();
+    dlg.querySelectorAll('input[name=lModus]').forEach(r => r.addEventListener('change', () => { renderAufgDef(); renderKey(); }));
+    dq('#lName').addEventListener('input', () => nameTouched = true);
+    if (isNew){
+      dq('#lName').select();
+      dq('#lKat').addEventListener('change', () => { if (!nameTouched) dq('#lName').value = defName(katOf(dq('#lKat').value)); });
+    }
+  }
+
+  /* ---------- Eingabefenster: Gesamtpunkte bzw. Aufgabenpunkte für alle Schüler·innen ---------- */
+  function openPunkte(k, l){
+    const auf = modusOf(l) === 'aufgaben';
+    const R = compute(k.stufe, l.key), kurs = k.stufe === 'kurs';
+    const T = auf ? l.aufgaben : [{id:'_', name:'Punkte', max:R.total}];
+    const draft = {};
+    k.schueler.forEach(s => { draft[s.id] = auf ? copy((l.ap || {})[s.id] || {}) : (l.werte[s.id] != null ? {_: l.werte[s.id]} : {}); });
+    if (!k.schueler.length){ alert('Diese Klasse hat noch keine Schüler·innen.'); return; }
+    let h = '<div class="keybox" style="margin-bottom:10px"><div class="keysum">Notenschlüssel: ' + keySummary(k.stufe, l.key) + '</div>' +
+      '<div class="keymini" style="margin-bottom:0">' + R.rows.filter(r => !r.na && !r.fail).map(r => '<span><b>' + r.g.label + '</b> ab ' + num(r.from) + '</span>').join('') + '</div></div>' +
+      '<div class="aout" id="pSum"></div><div class="tablewrap" style="max-height:52vh"><table class="key atab ptab"><thead><tr><th class="anr">Nr.</th><th style="text-align:left">Name</th>' +
+      T.map(t => '<th>' + esc(t.name) + '<small>max. ' + num(+t.max || 0) + '</small></th>').join('') +
+      (auf ? '<th>Summe</th>' : '') + '<th>%</th><th>' + (kurs ? 'VP' : 'Note') + '</th></tr></thead><tbody>';
+    k.schueler.forEach((s, i) => {
+      h += '<tr><td class="anr">' + (i + 1) + '</td><td style="text-align:left;white-space:nowrap">' + esc(s.name) + '</td>' +
+        T.map(t => '<td><input class="pp" data-ri="' + i + '" data-sid="' + s.id + '" data-tid="' + t.id + '" value="' + esc(draft[s.id][t.id] ?? '') + '" inputmode="decimal" autocomplete="off"></td>').join('') +
+        (auf ? '<td class="asum" id="ps-' + s.id + '"></td>' : '') + '<td id="pq-' + s.id + '"></td><td class="grade" id="pg-' + s.id + '"></td></tr>';
+    });
+    h += '</tbody><tfoot><tr><td></td><td style="text-align:left">Ø Punkte</td>' + T.map(t => '<td id="pa-' + t.id + '"></td>').join('') + (auf ? '<td id="pa-sum"></td>' : '') + '<td id="pa-q"></td><td id="pa-g"></td></tr>' +
+      (auf ? '<tr><td></td><td style="text-align:left">Lösungsquote</td>' + T.map(t => '<td id="pl-' + t.id + '"></td>').join('') + '<td colspan="3"></td></tr>' : '') +
+      '</tfoot></table></div><div class="hint">Enter bzw. ↑/↓ springt zur nächsten Person. Leer = (noch) keine Bewertung, „-“ = nicht mitgeschrieben.</div>';
+    const calc = () => {
+      const rows = k.schueler.map(s => {
+        let sum = 0, any = false, bad = false, skip = false;
+        T.forEach(t => {
+          const raw = String(draft[s.id][t.id] ?? '').trim(); if (raw === '') return;
+          if (/^(-|–|x|f|fehlt|a|att|attest)$/i.test(raw)){ skip = true; return; }
+          const x = parseFloat(raw.replace(',', '.'));
+          if (!/^\d+([.,]\d+)?$/.test(raw) || x > (+t.max || 0) + 1e-9){ bad = true; return; }
+          sum += x; any = true;
+        });
+        return {s, sum, any, bad, skip, g: any ? gradeFor(R, Math.min(sum, R.total)).g : null};
+      });
+      return rows;
+    };
+    const upd = () => {
+      const rows = calc(), setH = (id, v) => { const el = $(id); if (el) el.innerHTML = v; };
+      rows.forEach(o => {
+        if (auf) setH('ps-' + o.s.id, o.any ? num(o.sum) : '');
+        setH('pq-' + o.s.id, o.any ? num(o.sum / R.total * 100, 0) + ' %' : '');
+        setH('pg-' + o.s.id, o.g ? gradePill(k.stufe, o.g.v, o.g.label) + (kurs ? ' <small>(' + o.g.note + ')</small>' : '') : (o.skip ? '–' : ''));
+      });
+      dlg.querySelectorAll('.pp').forEach(inp => {
+        const raw = inp.value.trim(), t = T.find(x => x.id === inp.dataset.tid), x = parseFloat(raw.replace(',', '.'));
+        const bad = raw !== '' && !/^(-|–|x|f|fehlt|a|att|attest)$/i.test(raw) && (!/^\d+([.,]\d+)?$/.test(raw) || x > (+t.max || 0) + 1e-9);
+        inp.classList.toggle('bad', bad);
+      });
+      const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+      T.forEach(t => {
+        const xs = k.schueler.map(s => String(draft[s.id][t.id] ?? '').trim()).filter(r => /^\d+([.,]\d+)?$/.test(r)).map(r => parseFloat(r.replace(',', '.'))).filter(x => x <= (+t.max || 0) + 1e-9);
+        const avg = mean(xs);
+        setH('pa-' + t.id, avg != null ? num(avg, 2) : '–');
+        if (auf){ const q = avg != null && +t.max > 0 ? avg / t.max : null; setH('pl-' + t.id, q != null ? '<div class="qbar"><div style="width:' + Math.min(100, q * 100) + '%;background:' + quoteColor(q) + '"></div></div>' + num(q * 100, 0) + ' %' : '–'); }
+      });
+      const done = rows.filter(o => o.any), aS = mean(done.map(o => o.sum)), aG = mean(done.map(o => o.g.v));
+      if (auf) setH('pa-sum', aS != null ? num(aS, 2) : '–');
+      setH('pa-q', aS != null ? num(aS / R.total * 100, 0) + ' %' : '–');
+      setH('pa-g', aG != null ? num(aG, 2) : '–');
+      // Kurzfassung mit Notenspiegel
+      if (!done.length){ setH('pSum', '<span class="hint">Noch keine Punkte eingetragen.</span>'); return; }
+      const cnt = new Map();
+      done.forEach(o => cnt.set(o.g.label, (cnt.get(o.g.label) || 0) + 1));
+      const order = [...R.G].reverse().concat([FAIL[k.stufe]]).filter(g => cnt.has(g.label));
+      const under = done.filter(o => kurs ? o.g.v < 5 : o.g.v > 4).length;
+      setH('pSum', '<b>' + done.length + '</b> von ' + k.schueler.length + ' eingetragen · Ø ' + (kurs ? num(aG, 2) + ' VP' : 'Note ' + num(aG, 2)) +
+        ' · unter ' + (kurs ? '05 VP' : 'Note 4') + ': <b>' + under + '</b><br><span class="spiegelmini">' + order.map(g => '<span><b>' + g.label + '</b>: ' + cnt.get(g.label) + '</span>').join('') + '</span>');
+    };
+    openDialog((auf ? 'Aufgabenpunkte' : 'Punkte') + ' – ' + l.name + ' · ' + k.name, h, [
+      {label:'Abbrechen'},
+      ...(auf ? [{label:'Speichern & Auswertung', onClick:() => { const b = [...dlg.querySelectorAll('.dlgbtns button')].find(x => x.textContent === 'Speichern'); if (dlg.querySelector('.pp.bad')){ alert('Bitte die rot markierten Werte korrigieren.'); return false; } b.click(); setTimeout(() => openAuswertung(k, l), 0); return false; }}] : []),
+      {label:'Speichern', cls:'primary', onClick:() => {
+        if (dlg.querySelector('.pp.bad')){ alert('Bitte die rot markierten Werte korrigieren.'); return false; }
+        const rows = calc();
+        if (auf){
+          l.ap = {};
+          k.schueler.forEach(s => { const p = {}; Object.entries(draft[s.id]).forEach(([tid, v]) => { if (String(v).trim() !== '') p[tid] = String(v).trim(); }); if (Object.keys(p).length) l.ap[s.id] = p; });
+          rows.forEach(o => { if (o.any) l.werte[o.s.id] = String(Math.round(o.sum * 100) / 100); else if (o.skip) l.werte[o.s.id] = '-'; else delete l.werte[o.s.id]; });
+        } else {
+          k.schueler.forEach(s => { const v = String(draft[s.id]._ ?? '').trim(); if (v) l.werte[s.id] = v; else delete l.werte[s.id]; });
+        }
+        saveDB(); renderBuch();
+      }}], true);
+    dlg.classList.add('xwide');
+    const tb = dlg.querySelector('.ptab');
+    tb.addEventListener('input', e => { const t = e.target; if (!t.classList.contains('pp')) return; draft[t.dataset.sid][t.dataset.tid] = t.value; upd(); });
+    tb.addEventListener('keydown', e => {
+      const t = e.target; if (!t.classList.contains('pp') || !['Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+      e.preventDefault();
+      const next = tb.querySelector('.pp[data-ri="' + (+t.dataset.ri + (e.key === 'ArrowUp' ? -1 : 1)) + '"][data-tid="' + t.dataset.tid + '"]');
+      if (next){ next.focus(); next.select(); }
+    });
+    upd();
+    const first = tb.querySelector('.pp'); if (first){ first.focus(); first.select(); }
+  }
+
+  /* ---------- Auswertung einer Arbeit / eines Tests ---------- */
+  let auswView = 'balken';
+  const hasAusw = (k, l) => !isNoteKat(k.kats.find(c => c.id === l.kat) || {}) && k.schueler.some(s => cellVal(k, l, s.id).state === 'ok');
+
+  function auswData(k, l){
+    const modus = modusOf(l), kurs = k.stufe === 'kurs', pts = modus !== 'note';
+    const R = pts ? compute(k.stufe, l.key) : null;
+    const T = modus === 'aufgaben' ? (l.aufgaben || []) : [];
+    const isNum = v => /^\d+([.,]\d+)?$/.test(String(v).trim());
+    const pv = v => parseFloat(String(v).replace(',', '.'));
+    const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+    const res = k.schueler.map((s, i) => {
+      const x = cellVal(k, l, s.id);
+      if (x.state !== 'ok') return {s, i, ok:false, skip: x.state === 'skip'};
+      const g = pts ? gradeFor(R, x.pts).g : {v:x.v, label:x.label};
+      return {s, i, ok:true, pts: pts ? x.pts : null, g, tv: T.map(t => { const v = ((l.ap || {})[s.id] || {})[t.id]; return v != null && isNum(v) ? pv(v) : null; })};
+    });
+    const ok = res.filter(r => r.ok);
+    const avgG = mean(ok.map(r => r.g.v)), avgP = pts ? mean(ok.map(r => r.pts)) : null;
+    const under = ok.filter(r => kurs ? r.g.v < 5 : r.g.v > 4).length;
+    // Notenbild
+    let gradeDist;
+    if (pts) gradeDist = [...R.G].reverse().concat([FAIL[k.stufe]]).map(g => ({label:g.label, v:g.v, n: ok.filter(r => r.g.label === g.label).length}));
+    else if (kurs) gradeDist = Array.from({length:16}, (_, i) => 15 - i).map(v => ({label:String(v).padStart(2, '0'), v, n: ok.filter(r => r.g.v === v).length}));
+    else gradeDist = [1, 2, 3, 4, 5, 6].map(v => ({label:String(v), v, n: ok.filter(r => faceOf('mittel', r.g.v) === v).length}));
+    // Gesamtpunkteverteilung
+    const stepOf = xs => xs.some(x => Math.abs(x * 2 - Math.round(x * 2)) > 1e-9) ? 0.25 : xs.some(x => Math.abs(x - Math.round(x)) > 1e-9) ? 0.5 : 1;
+    const range = (from, to, st) => { const out = []; for (let v = from; v <= to + 1e-9; v += st) out.push(Math.round(v * 100) / 100); return out; };
+    const countIn = (xs, v) => xs.filter(x => Math.abs(x - v) < 1e-9).length;
+    let totalDist = [];
+    if (pts && ok.length){
+      const xs = ok.map(r => r.pts), st = stepOf(xs);
+      totalDist = range(0, R.total, st).reverse().map(v => ({v, n: countIn(xs, v), g: gradeFor(R, v).g.label}));
+    }
+    // Aufgaben
+    const per = T.map((t, j) => {
+      const max = +t.max || 0, xs = ok.map(r => r.tv[j]).filter(x => x != null && x <= max + 1e-9);
+      const avg = mean(xs);
+      return {t, max, xs, avg, q: avg != null && max > 0 ? avg / max : null, full: xs.filter(x => Math.abs(x - max) < 1e-9).length, zero: xs.filter(x => x === 0).length,
+        vals: range(0, max, stepOf(xs)), cnt: null};
+    });
+    per.forEach(p => p.cnt = p.vals.map(v => countIn(p.xs, v)));
+    const allStep = stepOf(per.flatMap(p => p.xs));
+    return {modus, kurs, pts, R, T, res, ok, avgG, avgP, under, gradeDist, totalDist, per, allStep, range, countIn};
+  }
+
+  function auswCsv(k, l){
+    const D = auswData(k, l), L = [], row = a => L.push(a.map(csvCell).join(';')), blank = () => L.push('');
+    const bar = n => '█'.repeat(Math.max(0, Math.round(n)));
+    const pct = (n, of) => of ? num(n / of * 100, 1) : '';
+    const gName = D.kurs ? 'VP' : 'Note';
+    row(['Auswertung', l.name]); row(['Klasse', k.name]); row(['Datum', fmtDate(l.datum)]);
+    row(['Art der Eintragung', MODI[D.modus].t]);
+    if (D.pts){ row(['Notenschlüssel', keySummary(k.stufe, l.key)]); row(['Gesamtpunktzahl', num(D.R.total)]); }
+    blank();
+    row(['ÜBERSICHT']);
+    row(['Ausgewertet', D.ok.length, 'von ' + k.schueler.length]);
+    row(['Ø ' + gName, D.avgG != null ? num(D.avgG, 2) : '']);
+    if (D.pts){ row(['Ø Punkte', D.avgP != null ? num(D.avgP, 2) : '', 'von ' + num(D.R.total)]); row(['Ø Prozent', D.avgP != null ? pct(D.avgP, D.R.total) + ' %' : '']); }
+    row(['unter ' + (D.kurs ? '05 VP' : 'Note 4'), D.under, D.ok.length ? pct(D.under, D.ok.length) + ' %' : '']);
+    if (D.per.length > 1){
+      const r = D.per.filter(p => p.q != null).sort((a, b) => a.q - b.q);
+      if (r.length){ row(['Am schwächsten gelöst', r[0].t.name, num(r[0].q * 100, 0) + ' %']); row(['Am besten gelöst', r[r.length - 1].t.name, num(r[r.length - 1].q * 100, 0) + ' %']); }
+    }
+    blank();
+    row(['NOTENBILD']);
+    row([gName].concat(D.pts ? ['Punkte ab'] : [], ['Anzahl', 'Anteil %', 'Balken']));
+    D.gradeDist.forEach(g => {
+      const from = D.pts ? (D.R.rows.find(r => r.g.label === g.label) || {}).from : null;
+      row([g.label].concat(D.pts ? [from != null ? num(from) : ''] : [], [g.n, pct(g.n, D.ok.length), bar(g.n)]));
+    });
+    if (D.pts && D.totalDist.length){
+      blank();
+      row(['GESAMTPUNKTEVERTEILUNG']);
+      row(['Punkte', gName, 'Anzahl', 'Balken']);
+      D.totalDist.forEach(t => row([num(t.v), t.g, t.n, bar(t.n)]));
+    }
+    if (D.per.length){
+      blank();
+      row(['AUFGABEN – ÜBERSICHT']);
+      row(['Aufgabe', 'max. Punkte', 'Ø Punkte', 'Lösungsquote %', 'volle Punktzahl', '0 Punkte', 'Lösungsquote (Balken, █ = 5 %)']);
+      D.per.forEach(p => row([p.t.name, num(p.max), p.avg != null ? num(p.avg, 2) : '', p.q != null ? num(p.q * 100, 1) : '', p.full, p.zero, p.q != null ? bar(p.q * 20) : '']));
+      blank();
+      row(['AUFGABEN – PUNKTEVERTEILUNG (Anzahl der Schüler·innen je erreichter Punktzahl)']);
+      const maxAll = Math.max(...D.per.map(p => p.max)), cols = D.range(0, maxAll, D.allStep);
+      row(['Aufgabe'].concat(cols.map(v => num(v) + ' P')));
+      D.per.forEach(p => row([p.t.name].concat(cols.map(v => v > p.max + 1e-9 ? '' : D.countIn(p.xs, v)))));
+      blank();
+      row(['AUFGABEN – BALKENDIAGRAMME']);
+      D.per.forEach(p => {
+        row([p.t.name + ' (max. ' + num(p.max) + ' P, Ø ' + (p.avg != null ? num(p.avg, 2) : '–') + ')']);
+        row(['Punkte', 'Anzahl', 'Balken']);
+        p.vals.slice().reverse().forEach((v, i) => { const n = p.cnt[p.vals.length - 1 - i]; row([num(v), n, bar(n)]); });
+        blank();
+      });
+    } else blank();
+    row(['EINZELERGEBNISSE']);
+    row(['Nr', 'Name'].concat(D.T.map(t => t.name + ' (max ' + num(+t.max || 0) + ')'), D.pts ? ['Punkte', 'Prozent'] : [], [gName]));
+    D.res.forEach(r => row([r.i + 1, r.s.name].concat(
+      D.T.map((t, j) => r.ok && r.tv[j] != null ? num(r.tv[j]) : ''),
+      D.pts ? [r.ok ? num(r.pts) : (r.skip ? '-' : ''), r.ok ? pct(r.pts, D.R.total) : ''] : [],
+      [r.ok ? r.g.label : (r.skip ? 'nicht mitgeschrieben' : '')])));
+    download('auswertung_' + (k.name + '_' + l.name).replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.csv', '﻿' + L.join('\r\n'), 'text/csv;charset=utf-8');
+  }
+
+  // Säulendiagramm (HTML) – gemeinsam für Fenster und PDF
+  function awChart(items, opts){
+    opts = opts || {};
+    const mx = Math.max(1, ...items.map(i => i.n)), H = opts.h || 110, every = items.length > 24 ? Math.ceil(items.length / 12) : 1;
+    const show = opts.show || ((it, i) => i % every === 0 || i === items.length - 1);
+    return '<div class="cc" style="height:' + (H + 36) + 'px">' + items.map((it, i) =>
+      '<div class="ccol" title="' + esc(it.tip || '') + '"><span class="cn">' + (it.n ? it.n : '') + '</span>' +
+      '<div class="cbar" style="height:' + Math.max(it.n ? 3 : 0, it.n / mx * H) + 'px;background:' + (it.color || 'var(--accent)') + '"></div>' +
+      '<span class="cl">' + (show(it, i) ? esc(it.label) : '') + '</span></div>').join('') + '</div>';
+  }
+  const niceStep = total => [1, 2, 5, 10, 20, 25, 50].find(s => total / s <= 16) || 100;
+  const onStep = (v, s) => Math.abs(v / s - Math.round(v / s)) < 1e-9;
+  function totalChart(k, D, h){
+    const ls = niceStep(D.R.total), gname = k.stufe === 'kurs' ? 'VP' : 'Note';
+    return awChart(D.totalDist.map(t => ({v:t.v, label:num(t.v), n:t.n, color:SM_FARBE[faceOf(k.stufe, gradeFor(D.R, t.v).g.v)],
+      tip:num(t.v) + ' Punkte (' + gname + ' ' + t.g + '): ' + t.n + '×'})), {h, show: it => onStep(it.v, ls)});
+  }
+
+  /* ---------- Eigener kleiner PDF-Erzeuger (A4, Vektorgrafik, ohne Bibliothek) ---------- */
+  const _mc = document.createElement('canvas').getContext('2d');
+  const WIN = {8211:150, 8212:151, 8230:133, 8364:128, 8222:132, 8220:147, 8221:148, 8218:130, 8216:145, 8217:146, 8226:149};
+  function pdfStr(t){
+    t = String(t).replace(/→/g, '->').replace(/←/g, '<-').replace(/[✓✔]/g, '').replace(/·/g, '·');
+    let o = '';
+    for (const ch of t){
+      let c = ch.codePointAt(0);
+      if (WIN[c]) c = WIN[c]; else if (c > 255) c = 63; // '?'
+      const b = String.fromCharCode(c);
+      o += (b === '(' || b === ')' || b === '\\') ? '\\' + b : b;
+    }
+    return o;
+  }
+  function PdfPage(scale, mx, my){
+    const ops = [], s = scale, H = 842;
+    const X = x => (mx + x * s).toFixed(2), Y = y => (H - my - y * s).toFixed(2);
+    const rgb = hex => { const h = hex.replace('#', ''); return [0, 2, 4].map(i => (parseInt(h.substr(i, 2), 16) / 255).toFixed(3)).join(' '); };
+    const P = {
+      ops,
+      measure(t, size, bold){ _mc.font = (bold ? 'bold ' : '') + size + 'px Helvetica, Arial, sans-serif'; return _mc.measureText(String(t)).width; },
+      rect(x, y, w, h, color, r, stroke){
+        if (w <= 0 || h <= 0) return;
+        r = Math.min(r || 0, w / 2, h / 2);
+        ops.push((stroke ? rgb(stroke) + ' RG 0.6 w ' : '') + (color ? rgb(color) + ' rg ' : ''));
+        if (!r) ops.push(X(x) + ' ' + Y(y + h) + ' ' + (w * s).toFixed(2) + ' ' + (h * s).toFixed(2) + ' re');
+        else {
+          const k = 0.5523 * r, p = (a, b) => X(a) + ' ' + Y(b);
+          ops.push(p(x + r, y) + ' m ' + p(x + w - r, y) + ' l ' + p(x + w - r + k, y) + ' ' + p(x + w, y + r - k) + ' ' + p(x + w, y + r) + ' c ' +
+            p(x + w, y + h - r) + ' l ' + p(x + w, y + h - r + k) + ' ' + p(x + w - r + k, y + h) + ' ' + p(x + w - r, y + h) + ' c ' +
+            p(x + r, y + h) + ' l ' + p(x + r - k, y + h) + ' ' + p(x, y + h - r + k) + ' ' + p(x, y + h - r) + ' c ' +
+            p(x, y + r) + ' l ' + p(x, y + r - k) + ' ' + p(x + r - k, y) + ' ' + p(x + r, y) + ' c h');
+        }
+        ops.push(color && stroke ? 'B' : color ? 'f' : 'S');
+      },
+      line(x1, y1, x2, y2, color, w){ ops.push(rgb(color) + ' RG ' + ((w || 0.6) * s).toFixed(2) + ' w ' + X(x1) + ' ' + Y(y1) + ' m ' + X(x2) + ' ' + Y(y2) + ' l S'); },
+      text(x, y, t, size, o){
+        o = o || {}; t = String(t); if (t === '') return;
+        const w = P.measure(t, size, o.bold);
+        if (o.align === 'center') x -= w / 2; else if (o.align === 'right') x -= w;
+        ops.push('BT ' + rgb(o.color || '#1d2330') + ' rg /' + (o.bold ? 'F2' : 'F1') + ' ' + (size * s).toFixed(2) + ' Tf ' + X(x) + ' ' + Y(y) + ' Td (' + pdfStr(t) + ') Tj ET');
+      },
+      wrap(t, size, w, bold){
+        const words = String(t).split(' '), lines = []; let cur = '';
+        words.forEach(wd => { const tt = cur ? cur + ' ' + wd : wd; if (P.measure(tt, size, bold) > w && cur){ lines.push(cur); cur = wd; } else cur = tt; });
+        if (cur) lines.push(cur); return lines;
+      }
+    };
+    return P;
+  }
+  function pdfBytes(contentOps){
+    const content = contentOps.join('\n');
+    const objs = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
+      '<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream'
+    ];
+    let out = '%PDF-1.4\n%âãÏÓ\n'; const offs = [];
+    objs.forEach((o, i) => { offs.push(out.length); out += (i + 1) + ' 0 obj\n' + o + '\nendobj\n'; });
+    const xref = out.length;
+    out += 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n' + offs.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+    out += 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+    const bytes = new Uint8Array(out.length);
+    for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+    return bytes;
+  }
+
+  // Zeichnet die Auswertung; gibt die benötigte Höhe zurück
+  function drawAusw(P, k, l, D, W){
+    const kurs = D.kurs, gname = kurs ? 'VP' : 'Note', MUT = '#667085', LINE = '#e3e6ec', BG = '#f5f6f8', ACC = '#2f5bd3';
+    let y = 0;
+    const bars = (x, yy, w, h, items, show) => {
+      const mx = Math.max(1, ...items.map(i => i.n)), base = yy + h - 11, maxH = h - 22, slot = w / items.length, bw = Math.min(slot * 0.72, 16);
+      P.line(x, base, x + w, base, LINE, 0.6);
+      items.forEach((it, i) => {
+        const cx = x + slot * i + slot / 2, bh = it.n / mx * maxH;
+        if (it.n) { P.rect(cx - bw / 2, base - bh, bw, bh, it.color || ACC, Math.min(2, bw / 3)); P.text(cx, base - bh - 2.5, it.n, 6.5, {align:'center', bold:true}); }
+        if (!show || show(it, i)) P.text(cx, base + 8, it.label, 6, {align:'center', color:MUT});
+      });
+    };
+    const section = t => { P.text(0, y + 10, t, 10, {bold:true}); y += 16; };
+    // Kopf
+    P.text(0, y + 16, 'Auswertung: ' + l.name, 16, {bold:true}); y += 22;
+    const meta = k.name + ' · ' + stufeName(k.stufe) + (l.datum ? ' · ' + fmtDate(l.datum) : '') + ' · ' + MODI[D.modus].t + (D.pts ? ' · Notenschlüssel: ' + keySummary(k.stufe, l.key) : '');
+    P.wrap(meta, 7.5, W, false).forEach(t => { P.text(0, y + 8, t, 7.5, {color:MUT}); y += 10; }); y += 6;
+    // Kacheln + Notenbild
+    const tw = 86, gap = 8, HH = 92;
+    const tile = (i, lab, val, sub) => { const x = i * (tw + gap); P.rect(x, y, tw, 54, BG, 6); P.text(x + 8, y + 13, lab, 7, {color:MUT}); P.text(x + 8, y + 33, val, 17, {bold:true}); P.text(x + 8, y + 46, sub, 6.5, {color:MUT}); };
+    tile(0, 'Ausgewertet', D.ok.length, 'von ' + k.schueler.length);
+    tile(1, 'Ø ' + gname, D.avgG != null ? num(D.avgG, 2) : '–', 'unter ' + (kurs ? '05 VP' : '4') + ': ' + D.under);
+    if (D.pts) tile(2, 'Ø Punkte', D.avgP != null ? num(D.avgP, 1) : '–', 'von ' + num(D.R.total) + (D.avgP != null ? ' · ' + num(D.avgP / D.R.total * 100, 0) + ' %' : ''));
+    const nx = 3 * (tw + gap), nw = W - nx;
+    P.rect(nx, y, nw, HH, BG, 6); P.text(nx + 8, y + 13, 'Notenbild', 7, {color:MUT});
+    bars(nx + 8, y + 16, nw - 16, HH - 18, D.gradeDist.map(g => ({label:g.label, n:g.n, color:SM_FARBE[faceOf(k.stufe, g.v)]})));
+    y += HH + 12;
+    // Gesamtpunkte
+    if (D.pts && D.totalDist.length){
+      section('Gesamtpunkteverteilung');
+      P.rect(0, y, W, 92, null, 6, LINE);
+      const ls = niceStep(D.R.total);
+      bars(8, y + 6, W - 16, 72, D.totalDist.map(t => ({v:t.v, label:num(t.v), n:t.n, color:SM_FARBE[faceOf(k.stufe, gradeFor(D.R, t.v).g.v)]})), it => onStep(it.v, ls));
+      P.text(W / 2, y + 87, '<- Gesamtpunkte (links Maximalpunktzahl) · Säulenhöhe = Anzahl · Farbe = Note', 6, {align:'center', color:MUT});
+      y += 92 + 12;
+    }
+    // Aufgaben
+    if (D.per.length){
+      section('Aufgaben');
+      const cols = Math.min(4, D.per.length), cg = 8, cw = (W - cg * (cols - 1)) / cols, ch = 118;
+      D.per.forEach((p, i) => {
+        const x = (i % cols) * (cw + cg), yy = y + Math.floor(i / cols) * (ch + cg);
+        P.rect(x, yy, cw, ch, null, 6, LINE);
+        P.text(x + 8, yy + 13, p.t.name, 9, {bold:true}); P.text(x + cw - 8, yy + 13, 'max. ' + num(p.max) + ' P', 6.5, {align:'right', color:MUT});
+        let kx = x + 8; const kt = 'Ø ' + (p.avg != null ? num(p.avg, 2) : '–') + ' P';
+        P.text(kx, yy + 25, kt, 7.5, {bold:true}); kx += P.measure(kt, 7.5, true) + 6;
+        if (p.q != null){ P.rect(kx, yy + 20.5, 34, 4, '#e9edf3', 2); P.rect(kx, yy + 20.5, 34 * Math.min(1, p.q), 4, quoteColor(p.q), 2); P.text(kx + 40, yy + 25, num(p.q * 100, 0) + ' %', 7.5, {color:MUT}); }
+        bars(x + 8, yy + 30, cw - 16, 76, p.vals.map((v, j) => ({label:num(v), n:p.cnt[j]})), p.vals.length > 16 ? ((it, j) => j % Math.ceil(p.vals.length / 12) === 0 || j === p.vals.length - 1) : null);
+        P.text(x + cw / 2, yy + ch - 5, 'erreichte Punkte -> Anzahl', 6, {align:'center', color:MUT});
+      });
+      y += Math.ceil(D.per.length / cols) * (ch + cg) + 4;
+      // Tabelle
+      section('Punkteverteilung je Aufgabe (Anzahl)');
+      const maxAll = Math.max(...D.per.map(p => p.max)), pc = D.range(0, maxAll, D.allStep);
+      const fixed = [['Aufgabe', 44, 'left'], ['max.', 22], ['Ø', 26], ['Quote', 28], ['voll', 20], ['0 P', 20]];
+      const fw = fixed.reduce((a, c) => a + c[1], 0), pw = (W - fw) / pc.length, rh = 12;
+      let x = 0;
+      fixed.forEach(c => { P.text(c[2] === 'left' ? x + 2 : x + c[1] / 2, y + 8, c[0].toUpperCase(), 5.8, {align:c[2] === 'left' ? 'left' : 'center', color:MUT, bold:true}); x += c[1]; });
+      pc.forEach((v, i) => P.text(fw + pw * i + pw / 2, y + 8, num(v), 5.8, {align:'center', color:MUT, bold:true}));
+      P.line(0, y + rh, W, y + rh, LINE); y += rh;
+      D.per.forEach(p => {
+        x = 0;
+        const vals = [p.t.name, num(p.max), p.avg != null ? num(p.avg, 2) : '–', p.q != null ? num(p.q * 100, 0) + ' %' : '–', p.full, p.zero];
+        fixed.forEach((c, i) => { P.text(c[2] === 'left' ? x + 2 : x + c[1] / 2, y + 8.5, vals[i], 7, {align:c[2] === 'left' ? 'left' : 'center', bold:i === 0 || i === 2}); x += c[1]; });
+        pc.forEach((v, i) => {
+          const cx = fw + pw * i;
+          if (v > p.max + 1e-9){ P.rect(cx + 0.5, y + 0.5, pw - 1, rh - 1, '#f1f2f5'); return; }
+          const n = D.countIn(p.xs, v);
+          if (n) P.rect(cx + 0.5, y + 0.5, pw - 1, rh - 1, '#e8eefc');
+          P.text(cx + pw / 2, y + 8.5, n, 7, {align:'center', bold:!!n, color:n ? '#1d2330' : '#c4c9d2'});
+        });
+        P.line(0, y + rh, W, y + rh, LINE); y += rh;
+      });
+      y += 10;
+    }
+    // Einzelergebnisse
+    section('Einzelergebnisse');
+    const half = Math.ceil(D.res.length / 2), colW = (W - 16) / 2, rh = 12.5;
+    [D.res.slice(0, half), D.res.slice(half)].forEach((list, c) => {
+      const x0 = c * (colW + 16); let yy = y;
+      P.text(x0 + 2, yy + 8, 'NAME', 5.8, {color:MUT, bold:true});
+      if (D.pts) P.text(x0 + colW - 60, yy + 8, 'PUNKTE', 5.8, {color:MUT, bold:true, align:'center'});
+      P.text(x0 + colW - 18, yy + 8, gname.toUpperCase(), 5.8, {color:MUT, bold:true, align:'center'});
+      P.line(x0, yy + rh, x0 + colW, yy + rh, LINE); yy += rh;
+      list.forEach(r => {
+        P.text(x0 + 2, yy + 8.8, r.s.name, 7.5);
+        if (D.pts) P.text(x0 + colW - 60, yy + 8.8, r.ok ? num(r.pts) : (r.skip ? '–' : ''), 7.5, {align:'center'});
+        if (r.ok){ const cc = gradeColors(k.stufe, r.g.v); P.rect(x0 + colW - 32, yy + 1.8, 28, rh - 3.6, cc.bg, 3); P.text(x0 + colW - 18, yy + 8.8, r.g.label, 7.5, {align:'center', bold:true, color:cc.fg}); }
+        else if (r.skip) P.text(x0 + colW - 18, yy + 8.8, 'n. m.', 6.5, {align:'center', color:MUT});
+        P.line(x0, yy + rh, x0 + colW, yy + rh, LINE); yy += rh;
+      });
+    });
+    y += (half + 1) * rh + 8;
+    P.text(W, y + 8, 'erstellt am ' + new Date().toLocaleDateString('de-DE') + ' · Notenbuch - created by Markus Seitz', 6, {align:'right', color:MUT});
+    return y + 12;
+  }
+
+  function auswPdfDownload(k, l){
+    const D = auswData(k, l), M = 28, PW = 595.28 - 2 * M, PH = 841.89 - 2 * M;
+    // passend auf eine Seite skalieren (bei Bedarf Breite anpassen und neu messen)
+    let s = 1, W = PW, P;
+    for (let it = 0; it < 4; it++){
+      P = PdfPage(s, M, M);
+      const h = drawAusw(P, k, l, D, W);
+      const ns = Math.min(1, PH / h);
+      if (Math.abs(ns - s) < 0.005 || (ns >= s && s === 1)) break;
+      s = ns; W = PW / s;
+    }
+    P = PdfPage(s, M, M); drawAusw(P, k, l, D, W);
+    const fname = ('Auswertung_' + k.name + '_' + l.name).replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.pdf';
+    download(fname, pdfBytes(P.ops), 'application/pdf');
+  }
+
+  /* ---------- Auswertung drucken (Druckansicht, eine Seite, farbig) ---------- */
+  function auswPdf(k, l){
+    const D = auswData(k, l), kurs = D.kurs, gname = kurs ? 'VP' : 'Note';
+    const css = `
+      *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      @page{size:A4 portrait;margin:9mm}
+      :root{--ink:#1d2330;--muted:#667085;--line:#e3e6ec;--bg:#f5f6f8;--accent:#2f5bd3}
+      body{margin:0;font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#fff}
+      #page{width:980px;transform-origin:top left}
+      h1{font-size:22px;margin:0}
+      .meta{color:var(--muted);font-size:12px;margin:2px 0 12px}
+      h3{font-size:14px;margin:14px 0 6px}
+      .head{display:grid;grid-template-columns:repeat(3,150px) 1fr;gap:10px;align-items:start}
+      .tile{background:var(--bg);border-radius:10px;padding:9px 12px;display:flex;flex-direction:column}
+      .tile small{color:var(--muted);font-size:11px}.tile b{font-size:24px;line-height:1.15}.tile span{color:var(--muted);font-size:11px}
+      .card{border:1px solid var(--line);border-radius:10px;padding:8px 10px;break-inside:avoid}
+      .grid{display:grid;grid-template-columns:repeat(${Math.min(Math.max(D.per.length, 1), 4)},1fr);gap:10px}
+      .ct{display:flex;justify-content:space-between;align-items:baseline}.ct span{color:var(--muted);font-size:11px}
+      .kpi{font-size:12px;color:var(--muted);margin:1px 0 6px}.kpi b{color:var(--ink)}
+      .axis{font-size:10px;color:var(--muted);text-align:center}
+      .cc{display:flex;align-items:flex-end;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px}
+      .ccol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;position:relative}
+      .cbar{width:72%;max-width:26px;border-radius:4px 4px 0 0}
+      .cn{font-size:10px;font-weight:600;line-height:13px;height:13px}
+      .cl{position:absolute;bottom:-16px;font-size:9.5px;color:var(--muted);white-space:nowrap}
+      .qbar{display:inline-block;vertical-align:middle;height:6px;width:46px;background:#e9edf3;border-radius:3px;overflow:hidden;margin:0 4px}.qbar i{display:block;height:100%}
+      table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:12px}
+      th,td{border-bottom:1px solid var(--line);padding:3px 6px;text-align:center}
+      th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+      th:first-child,td:first-child{text-align:left}
+      td.has{font-weight:700;background:#e8eefc}td.zero{color:#c4c9d2}
+      td.na{background:repeating-linear-gradient(45deg,#f1f2f5 0 4px,#fff 4px 8px)}
+      .pill{display:inline-block;min-width:30px;padding:1px 6px;border-radius:6px;font-weight:700}
+      .foot{margin-top:10px;color:var(--muted);font-size:10px;text-align:right}`;
+    const pill = (v, label) => { const c = gradeColors(k.stufe, v); return '<span class="pill" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(label) + '</span>'; };
+    let h = '<div id="page"><h1>Auswertung: ' + esc(l.name) + '</h1><div class="meta">' + esc(k.name) + ' · ' + stufeName(k.stufe) +
+      (l.datum ? ' · ' + fmtDate(l.datum) : '') + ' · ' + MODI[D.modus].t + (D.pts ? ' · Notenschlüssel: ' + esc(keySummary(k.stufe, l.key)) : '') + '</div>';
+    h += '<div class="head"><div class="tile"><small>Ausgewertet</small><b>' + D.ok.length + '</b><span>von ' + k.schueler.length + '</span></div>' +
+      '<div class="tile"><small>Ø ' + gname + '</small><b>' + (D.avgG != null ? num(D.avgG, 2) : '–') + '</b><span>unter ' + (kurs ? '05 VP' : '4') + ': ' + D.under + '</span></div>' +
+      (D.pts ? '<div class="tile"><small>Ø Punkte</small><b>' + (D.avgP != null ? num(D.avgP, 1) : '–') + '</b><span>von ' + num(D.R.total) + (D.avgP != null ? ' · ' + num(D.avgP / D.R.total * 100, 0) + ' %' : '') + '</span></div>' : '<div></div>') +
+      '<div class="tile"><small>Notenbild</small>' + awChart(D.gradeDist.map(g => ({label:g.label, n:g.n, color:SM_FARBE[faceOf(k.stufe, g.v)]})), {h:62}) + '</div></div>';
+    if (D.pts && D.totalDist.length)
+      h += '<h3>Gesamtpunkteverteilung</h3><div class="card">' + totalChart(k, D, 70) + '<div class="axis">← Gesamtpunkte (links Maximalpunktzahl) · Säulenhöhe = Anzahl · Farbe = Note</div></div>';
+    if (D.per.length){
+      h += '<h3>Aufgaben</h3><div class="grid">' + D.per.map(p =>
+        '<div class="card"><div class="ct"><b>' + esc(p.t.name) + '</b><span>max. ' + num(p.max) + ' P</span></div>' +
+        '<div class="kpi">Ø <b>' + (p.avg != null ? num(p.avg, 2) : '–') + '</b> P' + (p.q != null ? ' · <span class="qbar"><i style="width:' + Math.min(100, p.q * 100) + '%;background:' + quoteColor(p.q) + '"></i></span>' + num(p.q * 100, 0) + ' %' : '') + '</div>' +
+        awChart(p.vals.map((v, i) => ({label:num(v), n:p.cnt[i]})), {h:60}) + '<div class="axis">erreichte Punkte → Anzahl</div></div>').join('') + '</div>';
+      const maxAll = Math.max(...D.per.map(p => p.max)), cols = D.range(0, maxAll, D.allStep);
+      h += '<h3>Punkteverteilung je Aufgabe (Anzahl)</h3><table><thead><tr><th>Aufgabe</th><th>max.</th><th>Ø</th><th>Quote</th><th>voll</th><th>0 P</th>' + cols.map(v => '<th>' + num(v) + '</th>').join('') + '</tr></thead><tbody>' +
+        D.per.map(p => '<tr><td><b>' + esc(p.t.name) + '</b></td><td>' + num(p.max) + '</td><td><b>' + (p.avg != null ? num(p.avg, 2) : '–') + '</b></td><td>' + (p.q != null ? num(p.q * 100, 0) + ' %' : '–') + '</td><td>' + p.full + '</td><td>' + p.zero + '</td>' +
+          cols.map(v => { if (v > p.max + 1e-9) return '<td class="na"></td>'; const n = D.countIn(p.xs, v); return '<td class="' + (n ? 'has' : 'zero') + '">' + n + '</td>'; }).join('') + '</tr>').join('') + '</tbody></table>';
+    }
+    // Einzelergebnisse kompakt (zweispaltig)
+    const rows = D.res.map(r => '<tr><td>' + esc(r.s.name) + '</td>' + (D.pts ? '<td>' + (r.ok ? num(r.pts) : (r.skip ? '–' : '')) + '</td>' : '') + '<td>' + (r.ok ? pill(r.g.v, r.g.label) : '') + '</td></tr>');
+    const half = Math.ceil(rows.length / 2), thead = '<thead><tr><th>Name</th>' + (D.pts ? '<th>Punkte</th>' : '') + '<th>' + gname + '</th></tr></thead>';
+    h += '<h3>Einzelergebnisse</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><table>' + thead + '<tbody>' + rows.slice(0, half).join('') + '</tbody></table>' +
+      '<table>' + thead + '<tbody>' + rows.slice(half).join('') + '</tbody></table></div>';
+    h += '<div class="foot">erstellt am ' + new Date().toLocaleDateString('de-DE') + ' · Notenbuch - created by Markus Seitz</div></div>';
+
+    const fname = ('Auswertung ' + k.name + ' ' + l.name).replace(/[\\/:*?"<>|]+/g, ' ');
+    const fr = document.createElement('iframe');
+    fr.style.cssText = 'position:fixed;left:-10000px;top:0;width:1000px;height:1400px;border:0';
+    document.body.appendChild(fr);
+    const doc = fr.contentDocument;
+    doc.open(); doc.write('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>' + esc(fname) + '</title><style>' + css + '</style></head><body>' + h + '</body></html>'); doc.close();
+    setTimeout(() => {
+      // auf eine A4-Seite skalieren (Druckbereich ca. 192 × 279 mm ≈ 725 × 1054 px)
+      const pg = doc.getElementById('page'), W = 725, H = 1050;
+      const sc = Math.min(W / pg.scrollWidth, H / pg.scrollHeight, 1);
+      pg.style.zoom = sc;
+      const old = document.title; document.title = fname;
+      fr.contentWindow.focus(); fr.contentWindow.print();
+      setTimeout(() => { document.title = old; fr.remove(); }, 1500);
+    }, 150);
+  }
+
+  function openAuswertung(k, l){
+    const D = auswData(k, l), kurs = D.kurs;
+    const colChart = awChart;
+    const gname = kurs ? 'VP' : 'Note';
+    let h = '<div class="aw-head">' +
+      '<div class="tile"><small>Ausgewertet</small><b>' + D.ok.length + '</b><span>von ' + k.schueler.length + '</span></div>' +
+      '<div class="tile"><small>Ø ' + gname + '</small><b>' + (D.avgG != null ? num(D.avgG, 2) : '–') + '</b><span>unter ' + (kurs ? '05 VP' : '4') + ': ' + D.under + '</span></div>' +
+      (D.pts ? '<div class="tile"><small>Ø Punkte</small><b>' + (D.avgP != null ? num(D.avgP, 1) : '–') + '</b><span>von ' + num(D.R.total) + (D.avgP != null ? ' · ' + num(D.avgP / D.R.total * 100, 0) + ' %' : '') + '</span></div>' : '<div></div>') +
+      '<div class="tile wide"><small>Notenbild</small>' + colChart(D.gradeDist.map(g => ({label:g.label, n:g.n, color:SM_FARBE[faceOf(k.stufe, g.v)], tip:(kurs ? g.label + ' VP' : 'Note ' + g.label) + ': ' + g.n + '×'})), {h:60}) + '</div></div>';
+    if (D.pts && D.totalDist.length)
+      h += '<h3 class="aw-h3">Gesamtpunkteverteilung</h3><div class="aw-card">' +
+        totalChart(k, D, 70) + '<div class="aw-axis">← Gesamtpunkte (links Maximalpunktzahl) · Säulenhöhe = Anzahl · Farbe = Note</div></div>';
+    if (D.per.length)
+      h += '<div class="row" style="justify-content:space-between;margin:14px 0 8px"><h3 class="aw-h3" style="margin:0">Aufgaben</h3>' +
+        '<div class="seg aw-seg"><label><input type="radio" name="awv" value="balken"' + (auswView === 'balken' ? ' checked' : '') + '>Balkendiagramm</label>' +
+        '<label><input type="radio" name="awv" value="zahlen"' + (auswView === 'zahlen' ? ' checked' : '') + '>Zahlen</label></div></div><div id="awBody"></div>';
+    const body = () => {
+      if (auswView === 'balken')
+        return '<div class="aw-grid">' + D.per.map(p =>
+          '<div class="aw-card"><div class="aw-ct"><b>' + esc(p.t.name) + '</b><span>max. ' + num(p.max) + ' P</span></div>' +
+          '<div class="aw-kpi">Ø <b>' + (p.avg != null ? num(p.avg, 2) : '–') + '</b> P' +
+          (p.q != null ? ' · <span class="qbar" style="display:inline-block;vertical-align:middle;margin:0 4px"><div style="width:' + Math.min(100, p.q * 100) + '%;background:' + quoteColor(p.q) + '"></div></span>' + num(p.q * 100, 0) + ' %' : '') + '</div>' +
+          colChart(p.vals.map((v, i) => ({label:num(v), n:p.cnt[i], tip:num(v) + ' Punkte: ' + p.cnt[i] + '×'})), {h:90}) +
+          '<div class="aw-axis">erreichte Punkte → Anzahl</div></div>').join('') + '</div>';
+      const maxAll = Math.max(...D.per.map(p => p.max)), cols = D.range(0, maxAll, D.allStep);
+      return '<div class="tablewrap"><table class="key atab aw-tab"><thead><tr><th style="text-align:left">Aufgabe</th><th>max.</th><th>Ø</th><th>Quote</th>' +
+        cols.map(v => '<th>' + num(v) + '</th>').join('') + '</tr></thead><tbody>' +
+        D.per.map(p => '<tr><td style="text-align:left"><b>' + esc(p.t.name) + '</b></td><td>' + num(p.max) + '</td><td><b>' + (p.avg != null ? num(p.avg, 2) : '–') + '</b></td><td>' + (p.q != null ? num(p.q * 100, 0) + ' %' : '–') + '</td>' +
+          cols.map(v => { if (v > p.max + 1e-9) return '<td class="na-c"></td>'; const n = D.countIn(p.xs, v); return '<td class="' + (n ? 'has' : 'zero') + '">' + n + '</td>'; }).join('') + '</tr>').join('') +
+        '</tbody></table></div><div class="hint">Spalten = erreichte Punktzahl, Zellen = wie viele Schüler·innen diese Punktzahl in der Aufgabe erreicht haben.</div>';
+    };
+    const btns = [{label:'PDF herunterladen', onClick:() => { auswPdfDownload(k, l); return false; }}, {label:'CSV herunterladen', onClick:() => { auswCsv(k, l); return false; }}, {label:'Drucken', onClick:() => { auswPdf(k, l); return false; }}];
+    if (D.pts) btns.push({label:'Punkte bearbeiten', onClick:() => { setTimeout(() => openPunkte(k, l), 0); }});
+    btns.push({label:'Schließen', cls:'primary'});
+    openDialog('Auswertung – ' + l.name + ' · ' + k.name, h, btns, true);
+    dlg.classList.add('xwide');
+    if (D.per.length){
+      const draw = () => { dq('#awBody').innerHTML = body(); };
+      draw();
+      dlg.querySelectorAll('input[name=awv]').forEach(r => r.addEventListener('change', () => { auswView = r.value; draw(); }));
+    }
+  }
+
+  /* ---------- Verknüpfung Notenbuch ↔ Rechner ---------- */
+  function startLink(k, l){
+    if (!k || !l) return;
+    S.linkBackup = copy(S[k.stufe]);
+    S[k.stufe] = copy(l.key);
+    S.stufe = k.stufe;
+    S.link = {kid:k.id, lid:l.id};
+    save(); setView('rechner');
+  }
+  function linkTarget(){
+    if (!S.link) return null;
+    const k = DB.klassen.find(x => x.id === S.link.kid), l = k && k.leistungen.find(x => x.id === S.link.lid);
+    return l ? {k, l} : null;
+  }
+  function endLink(apply){
+    const t = linkTarget();
+    if (apply && t){ t.l.key = copy(S[t.k.stufe]); saveDB(); }
+    if (S.linkBackup) S[S.stufe] = S.linkBackup;
+    delete S.link; delete S.linkBackup; save();
+    if (t) DB.aktiv = t.k.id;
+    setView('buch');
+  }
+
+  /* ---------- Export ---------- */
+  function exportCsv(k){
+    normalize(k);
+    const head = ['Nr', 'Name'], plan = [];
+    k.kats.forEach(c => {
+      if (isNoteKat(c)) groupsOf(k, c).forEach(g => { head.push(c.name + ' ' + g.nr + ' (Einzelnoten)', c.name + ' ' + g.nr + ' (Ø)'); plan.push({c, g}); });
+      else k.leistungen.filter(l => l.kat === c.id).sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))
+        .forEach(l => { head.push(l.name + ' (Punkte)', l.name + ' (Note)'); plan.push({l}); });
+    });
+    k.kats.forEach(c => head.push('Ø ' + c.name)); head.push('Ø Gesamt', 'Zeugnis');
+    const lines = [head.map(csvCell).join(';')];
+    keyCache.clear();
+    k.schueler.forEach((s, r) => {
+      const st = stats(k, s.id), row = [r + 1, s.name];
+      plan.forEach(p => {
+        if (p.l){ const x = cellVal(k, p.l, s.id); row.push(p.l.werte[s.id] ?? '', x.state === 'ok' ? x.label : ''); }
+        else {
+          row.push(p.g.ls.map(l => l.werte[s.id]).filter(v => v != null && v !== '').join(' '));
+          const a = st.grp[p.c.id + ':' + p.g.nr]; row.push(a == null ? '' : num(a, 2));
+        }
+      });
+      k.kats.forEach(c => row.push(st.cat[c.id] == null ? '' : num(st.cat[c.id], 2)));
+      row.push(st.total == null ? '' : num(st.total, 2), s.zeugnis || '');
+      lines.push(row.map(csvCell).join(';'));
+    });
+    download('notenbuch_' + k.name.replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.csv', '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+  }
+
+  /* ---------- Ereignisse Notenbuch ---------- */
+  $('klassenListe').addEventListener('click', e => {
+    const li = e.target.closest('li[data-kid]'); if (!li) return;
+    DB.aktiv = li.dataset.kid; saveDB(); renderBuch();
+  });
+  $('neueKlasse').onclick = () => openKlasse(null);
+  const main = $('buchMain');
+  main.addEventListener('click', e => {
+    const k = aktKlasse();
+    const ep = e.target.closest('[data-epick]');
+    if (ep && k){
+      const l = entryL(); if (!l) return;
+      const sid = ep.dataset.s;
+      if (ep.classList.contains('on')) delete l.werte[sid]; else l.werte[sid] = ep.dataset.epick;
+      saveDB(); refreshDerived(); return;
+    }
+    const act = e.target.closest('[data-act]');
+    if (act){
+      const a = act.dataset.act;
+      if (a === 'entryDone') return finishEntry();
+      if (a === 'entryCancel'){
+        const l = entryL();
+        if (l && Object.keys(l.werte).length && !confirm(entry.neu ? 'Die Noten dieses Termins verwerfen?' : 'Diesen Termin (' + (fmtDate(l.datum) || '–') + ') mit allen Noten löschen?')) return;
+        if (l) l.werte = {};
+        return finishEntry();
+      }
+      if (a === 'neueKlasse') return openKlasse(null);
+      if (!k) return;
+      if (a === 'leistung'){
+        const pc = k.kats.find(c => katTyp(c) === 'punkte');
+        if (pc) openLeistung(k, null, null, pc.id); else openNummerWahl(k, k.kats[0]);
+      }
+      else if (a === 'kategorie') openKategorie(k, null);
+      else if (a === 'schueler') openAddSchueler(k);
+      else if (a === 'klasse') openKlasse(k);
+      else if (a === 'sort'){ k.schueler.sort((x, y) => x.name.localeCompare(y.name, 'de')); saveDB(); renderBuch(); }
+      else if (a === 'csv') exportCsv(k);
+      else if (a === 'print') window.print();
+      return;
+    }
+    const aw = e.target.closest('[data-ausw]');
+    if (aw && k){ const l = k.leistungen.find(x => x.id === aw.dataset.ausw); if (l) return openAuswertung(k, l); }
+    const add = e.target.closest('[data-addkat]');
+    if (add && k){
+      const c = k.kats.find(x => x.id === add.dataset.addkat);
+      return isNoteKat(c) ? openNummerWahl(k, c) : openLeistung(k, null, null, c.id);
+    }
+    const cth = e.target.closest('th[data-kat]');
+    if (cth && k) return openKategorie(k, k.kats.find(c => c.id === cth.dataset.kat));
+    const ga = e.target.closest('[data-addgrp]');
+    if (ga && k){ const [cid, nr] = ga.dataset.addgrp.split(':'); return startEntry(k, k.kats.find(c => c.id === cid), +nr); }
+    const term = e.target.closest('[data-term]');
+    if (term && k && !term.classList.contains('entrycol')){
+      const l = k.leistungen.find(x => x.id === term.dataset.term); if (l) return editEntry(k, l);
+    }
+    const gth = e.target.closest('[data-grp]');
+    if (gth && k){ const [cid, nr] = gth.dataset.grp.split(':'); return openGruppe(k, k.kats.find(c => c.id === cid), +nr); }
+    const th = e.target.closest('th[data-lid]');
+    if (th && k){
+      const l = k.leistungen.find(x => x.id === th.dataset.lid);
+      return openLeistung(k, l);
+    }
+    const ro = e.target.closest('input.ro[data-l]');
+    if (ro && k){ const l = k.leistungen.find(x => x.id === ro.dataset.l); if (l) return openPunkte(k, l); }
+    const td = e.target.closest('td[data-sid]');
+    if (td && k) return openSchueler(k, k.schueler.find(s => s.id === td.dataset.sid));
+  });
+  main.addEventListener('input', e => {
+    const k = aktKlasse(), t = e.target; if (!k) return;
+    if (t.dataset.l){
+      const l = k.leistungen.find(x => x.id === t.dataset.l); if (!l) return;
+      if (t.value.trim() === '') delete l.werte[t.dataset.s]; else l.werte[t.dataset.s] = t.value.trim();
+      saveDB(); refreshDerived();
+    } else if (t.dataset.z){
+      const s = k.schueler.find(x => x.id === t.dataset.z); if (s){ s.zeugnis = t.value; saveDB(); }
+    }
+  });
+  /* ---------- Smiley-Auswahl zum Ändern einer Einzelnote ---------- */
+  const picker = $('smPicker');
+  let pickCb = null, pickAnchor = null;
+  const pickVals = stufe => stufe === 'kurs' ? [14, 11, 8, 5, 2, 0] : [1, 2, 3, 4, 5, 6];
+  function showPickerAt(anchor, stufe, curVal, cb){
+    pickCb = cb; pickAnchor = anchor;
+    const vals = pickVals(stufe), curV = String(curVal ?? '').trim();
+    picker.innerHTML = vals.map((v, i) => '<button type="button" data-pv="' + v + '" class="' + (curV === String(v) ? 'on' : '') + '" title="' +
+      (stufe === 'kurs' ? v + ' VP (Note ' + (i + 1) + ')' : 'Note ' + v) + '">' + smiley(i + 1, 28) + '<span>' + (stufe === 'kurs' ? String(v).padStart(2, '0') : v) + '</span></button>').join('') +
+      '<button type="button" class="clr" data-pv="" title="Note entfernen">×</button>';
+    picker.hidden = false;
+    const r = anchor.getBoundingClientRect(), pw = picker.offsetWidth, ph = picker.offsetHeight;
+    let left = r.left + r.width / 2 - pw / 2, top = r.bottom + 6;
+    left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+    if (top + ph > window.innerHeight - 8) top = r.top - ph - 6;
+    picker.style.left = left + 'px'; picker.style.top = top + 'px';
+  }
+  function hidePicker(){ picker.hidden = true; pickCb = null; pickAnchor = null; }
+  picker.addEventListener('click', e => {
+    const b = e.target.closest('[data-pv]'); if (!b || !pickCb) return;
+    const cb = pickCb; hidePicker(); cb(b.dataset.pv);
+  });
+  document.addEventListener('mousedown', e => { if (!picker.hidden && !picker.contains(e.target) && e.target.closest('.gsm') !== pickAnchor) hidePicker(); });
+  window.addEventListener('scroll', hidePicker, true);
+  window.addEventListener('resize', hidePicker);
+
+  main.addEventListener('change', e => {
+    if (e.target.id !== 'eDatum') return;
+    const l = entryL(); if (!l) return;
+    l.datum = e.target.value; saveDB(); renderBuch();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && entry && !dlg.open) finishEntry(); });
+
+  main.addEventListener('keydown', e => {
+    const t = e.target; if (!(t.dataset.l || t.dataset.z)) return;
+    if (!['Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    const tr = t.closest('tr'), td = t.closest('td'), idx = [...tr.children].indexOf(td);
+    const next = e.key === 'ArrowUp' ? tr.previousElementSibling : tr.nextElementSibling;
+    const inp = next && next.children[idx] && next.children[idx].querySelector('input');
+    if (inp){ inp.focus(); inp.select(); }
+  });
+
+  $('exportJson').onclick = () => {
+    const data = {app:'notenbuch', version:1, exportiert:new Date().toISOString(), notenbuch:DB, rechner:S};
+    download('notenbuch_sicherung_' + today() + '.json', JSON.stringify(data, null, 1), 'application/json');
+  };
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const data = JSON.parse(rd.result);
+        if (!data.notenbuch || !Array.isArray(data.notenbuch.klassen)) throw new Error();
+        if (!confirm('Sicherung vom ' + (data.exportiert ? new Date(data.exportiert).toLocaleString('de-DE') : 'unbekannten Datum') + ' laden? Die aktuellen Daten in diesem Browser werden ersetzt.')) return;
+        DB = data.notenbuch; DB.view = 'buch';
+        if (data.rechner && data.rechner.mittel && data.rechner.kurs){ S = data.rechner; delete S.link; delete S.linkBackup; save(); }
+        saveDB(); setView('buch');
+      } catch(err){ alert('Die Datei ist keine gültige Notenbuch-Sicherung.'); }
+      e.target.value = '';
+    };
+    rd.readAsText(f);
+  };
+
+  /* ============================================================
+     Rechner – Darstellung
+     ============================================================ */
+  function renderRechner(){
+    const R = compute(S.stufe, cur()), st = R.st, kurs = R.stufe === 'kurs';
+    const link = linkTarget();
+    if (S.link && !link){ delete S.link; if (S.linkBackup){ S[S.stufe] = S.linkBackup; delete S.linkBackup; } save(); return renderRechner(); }
+
+    $('stufeTabs').hidden = !!link;
+    $('toBuch').hidden = !!link;
+    $('resetAll').hidden = !!link;
+    $('titelField').hidden = !!link;
+    const lb = $('linkbar');
+    lb.hidden = !link;
+    if (link){
+      lb.innerHTML = '<span>Du bearbeitest den Notenschlüssel von <b>' + esc(link.l.name) + '</b> (' + esc(link.k.name) + '). Änderungen gelten erst nach „Übernehmen“.</span>' +
+        '<button class="btn" type="button" data-link="0">Verwerfen</button><button class="btn primary" type="button" data-link="1">Übernehmen &amp; zurück</button>';
+    }
+
+    document.querySelectorAll('#stufeTabs button').forEach(b => b.classList.toggle('active', b.dataset.stufe === S.stufe));
+    document.querySelectorAll('#view-rechner [data-show]').forEach(el => el.style.display = el.dataset.show === S.stufe ? '' : 'none');
+    document.querySelectorAll('#view-rechner [data-typ]').forEach(el => el.style.display = el.dataset.typ === st.typ ? '' : 'none');
+    document.querySelectorAll('#view-rechner [data-notyp]').forEach(el => el.style.display = el.dataset.notyp === st.typ ? 'none' : '');
+
+    const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
+    set('titel', S.titel || ''); set('total', st.total); set('step', String(st.step)); set('typ', st.typ);
+    set('sockel', st.sockel); set('sockelR', st.sockel); set('exp', st.exp); set('expR', st.exp); set('knick', st.knick);
+    $('topAuto').checked = !!st.topAuto; $('top').disabled = !!st.topAuto;
+    set('top', st.topAuto ? +R.top.toFixed(2) : st.top);
+    document.querySelectorAll('input[name=skala]').forEach(r => r.checked = r.value === st.skala);
+    $('sockelHint').textContent = kurs ? 'Unterhalb des Sockels gibt es 00 VP.' : 'Unterhalb des Sockels gibt es die Note 6.';
+    $('knickLbl').textContent = kurs ? 'Bestehensgrenze 05 VP ab (%)' : 'Bestehensgrenze Note 4 ab (%)';
+    $('skalaHint').textContent = st.skala === 'viertel' ? '1, 1-, 1-2, 2+, 2, … 5-, 5-6' : st.skala === 'halb' ? '1; 1,5; 2; … 5; 5,5' : '1, 2, 3, 4, 5';
+
+    $('summary').textContent = (kurs ? 'Kursstufe · 00–15 VP' : 'Mittelstufe · ' + SKALA[st.skala]) +
+      ' · ' + num(R.total) + ' Punkte · Sockel ' + num(R.p[0], 1) + ' % · ' + TYP[st.typ];
+    const pt = link ? link.l.name + ' – ' + link.k.name : S.titel;
+    $('printTitle').textContent = (pt ? pt + ' – ' : '') + 'Notenschlüssel';
+    $('warnings').innerHTML = R.warn.map(w => '<div class="warn">' + w + '</div>').join('');
+
+    const showVal = !kurs && st.skala === 'viertel';
+    let h = '<thead><tr><th>' + (kurs ? 'VP' : 'Note') + '</th>' + (kurs ? '<th>Note</th>' : '') + (showVal ? '<th>Wert</th>' : '') +
+      '<th>Prozent ab</th><th>Punkte von</th><th>bis</th></tr></thead><tbody>';
+    for (const r of R.rows){
+      const cls = (r.fail ? 'fail ' : '') + (r.na ? 'na' : '');
+      let pctCell;
+      if (r.fail) pctCell = '0 %';
+      else if (st.typ === 'custom') pctCell = '<input type="number" step="0.5" min="0" max="100" data-ci="' + r.i + '" value="' + (+r.pct.toFixed(2)) + '"> %';
+      else pctCell = num(r.pct, 1) + ' %';
+      h += '<tr class="' + cls + '"><td class="grade">' + r.g.label + '</td>' +
+        (kurs ? '<td>' + r.g.note + '</td>' : '') + (showVal ? '<td>' + num(r.g.v) + '</td>' : '') +
+        '<td>' + pctCell + '</td><td>' + (r.na ? '–' : num(r.from)) + '</td><td>' + (r.na ? '–' : num(r.to)) + '</td></tr>';
+    }
+    $('keyTable').innerHTML = h + '</tbody>';
+    $('keyTable').querySelectorAll('input[data-ci]').forEach(inp => inp.addEventListener('change', e => {
+      const key = customKey(S.stufe, st), v = parseFloat(String(e.target.value).replace(',', '.'));
+      if (!isNaN(v)){ st.custom[key][+e.target.dataset.ci] = v; save(); renderRechner(); }
+    }));
+    renderCalc(R); renderSpiegel(R); window.__R = R; renderAufg(R);
+    window.__R = R;
+  }
+
+  function renderCalc(R){
+    const raw = $('calcPts').value;
+    if (raw === ''){ $('calcRes').innerHTML = '–'; return; }
+    const pts = parseFloat(String(raw).replace(',', '.'));
+    if (isNaN(pts) || pts < 0 || pts > R.total){ $('calcRes').innerHTML = '<small>Bitte einen Wert zwischen 0 und ' + num(R.total) + ' eingeben.</small>'; return; }
+    const {g} = gradeFor(R, pts);
+    const txt = R.stufe === 'kurs' ? g.label + ' VP <small>(Note ' + g.note + ')</small>' : 'Note ' + g.label + (R.st.skala === 'viertel' && g.v % 1 ? ' <small>(' + num(g.v) + ')</small>' : '');
+    $('calcRes').innerHTML = txt + '<br><small>' + num(pts / R.total * 100, 1) + ' % der Gesamtpunktzahl</small>';
+  }
+
+  function renderSpiegel(R){
+    const vals = $('list').value.split(/[\s;]+/).map(x => x.replace(',', '.')).filter(x => x !== '').map(Number);
+    const ok = vals.filter(v => !isNaN(v) && v >= 0 && v <= R.total);
+    const bad = vals.length - ok.length;
+    if (!ok.length){ $('spiegel').innerHTML = bad ? '<div class="warn">Keine gültigen Werte (0–' + num(R.total) + ').</div>' : ''; return; }
+    const all = [...R.G].reverse().concat([FAIL[R.stufe]]);
+    const cnt = new Map(all.map(g => [g.label, 0]));
+    let sum = 0, under = 0;
+    ok.forEach(v => { const {g, i} = gradeFor(R, v); cnt.set(g.label, cnt.get(g.label) + 1); sum += g.v; if (i < passIdx(R.stufe, R.G)) under++; });
+    const max = Math.max(...cnt.values());
+    let h = (bad ? '<div class="warn">' + bad + ' ungültige(r) Wert(e) ignoriert.</div>' : '') +
+      '<p style="margin:0 0 8px"><b>' + ok.length + '</b> Arbeiten · Durchschnitt <b>' + num(sum / ok.length, 2) + (R.stufe === 'kurs' ? ' VP' : '') +
+      '</b> · unter ' + (R.stufe === 'kurs' ? '05 VP' : 'Note 4') + ': <b>' + under + '</b> (' + num(under / ok.length * 100, 0) + ' %)</p>' +
+      '<table class="key"><thead><tr><th>' + (R.stufe === 'kurs' ? 'VP' : 'Note') + '</th><th>Anzahl</th><th style="width:45%"></th></tr></thead><tbody>';
+    all.forEach(g => { const c = cnt.get(g.label); h += '<tr><td class="grade">' + g.label + '</td><td>' + c + '</td><td>' + (c ? '<div class="bar" style="width:' + (c / max * 100) + '%"></div>' : '') + '</td></tr>'; });
+    $('spiegel').innerHTML = h + '</tbody></table>';
+  }
+
+  /* ============================================================
+     Rechner – Auswertung nach Aufgaben
+     ============================================================ */
+  const AUFG_DEF = () => ({
+    tasks: [1, 2, 3, 4].map(i => ({id:uid(), name:'A' + i, max:10})),
+    rows: Array.from({length:5}, () => ({id:uid(), name:'', p:{}})),
+    kid: null
+  });
+  const aufg = () => { if (!S.aufg || !Array.isArray(S.aufg.tasks) || !S.aufg.tasks.length) S.aufg = AUFG_DEF(); return S.aufg; };
+  const pnum = v => parseFloat(String(v).replace(',', '.'));
+  const quoteColor = q => q < 0.5 ? '#d7263d' : q < 0.75 ? '#e8a317' : '#2e9e4f';
+
+  function renderAufg(R){
+    const A = aufg(), box = $('aufgBox');
+    const maxSum = A.tasks.reduce((a, t) => a + (+t.max || 0), 0);
+    const klassen = DB.klassen.filter(k => k.stufe === S.stufe);
+    const kl = A.kid && DB.klassen.find(k => k.id === A.kid && k.stufe === S.stufe);
+    let h = '<div class="adef"><span class="lbl" style="margin:0 6px 0 0">Aufgaben:</span>' + A.tasks.map((t, i) =>
+      '<div class="atask"><input type="text" class="an" data-ti="' + i + '" value="' + esc(t.name) + '" title="Bezeichnung">' +
+      '<input type="number" class="am" data-ti="' + i + '" min="0" step="0.5" value="' + t.max + '" title="Maximalpunkte"><span>P</span></div>').join('') +
+      '<button class="btn" type="button" data-aact="addTask">+ Aufgabe</button>' +
+      (A.tasks.length > 1 ? '<button class="btn" type="button" data-aact="delTask">− letzte</button>' : '') + '</div>';
+    h += Math.abs(maxSum - R.total) > 1e-9
+      ? '<div class="warn">Die Aufgaben ergeben zusammen <b>' + num(maxSum) + '</b> Punkte, die Gesamtpunktzahl im Schlüssel ist <b>' + num(R.total) + '</b>. ' +
+        '<button class="btn" type="button" data-aact="setTotal" style="margin-left:6px">Gesamtpunktzahl auf ' + num(maxSum) + ' setzen</button></div>'
+      : '<div class="hint" style="margin:0 0 10px">Summe der Aufgaben = Gesamtpunktzahl (' + num(R.total) + ' P) ✓</div>';
+    h += '<div class="aout" id="aSummary"></div>';
+    h += '<div class="tablewrap"><table class="key atab"><thead><tr><th class="anr">Nr.</th><th style="text-align:left">Name</th>' +
+      A.tasks.map(t => '<th>' + esc(t.name) + '<small>max. ' + num(+t.max || 0) + '</small></th>').join('') +
+      '<th>Summe</th><th>%</th><th>' + (S.stufe === 'kurs' ? 'VP' : 'Note') + '</th><th class="noprint"></th></tr></thead><tbody>';
+    A.rows.forEach((r, i) => {
+      h += '<tr><td class="anr">' + (i + 1) + '</td><td style="text-align:left"><input type="text" class="arn" data-ri="' + i + '" value="' + esc(r.name) + '" placeholder="Schüler·in ' + (i + 1) + '"></td>' +
+        A.tasks.map(t => '<td><input class="ap" data-ri="' + i + '" data-tid="' + t.id + '" value="' + esc(r.p[t.id] ?? '') + '" inputmode="decimal" autocomplete="off"></td>').join('') +
+        '<td class="asum" id="as-' + r.id + '"></td><td id="aq-' + r.id + '"></td><td class="grade" id="ag-' + r.id + '"></td>' +
+        '<td class="noprint"><button type="button" class="qclr" data-aact="delRow" data-ri="' + i + '" title="Zeile löschen">×</button></td></tr>';
+    });
+    const foot = (label, fn, rest) => '<tr><td></td><td style="text-align:left">' + label + '</td>' + A.tasks.map(fn).join('') + rest + '</tr>';
+    h += '</tbody><tfoot>' +
+      foot('Ø Punkte', t => '<td id="aa-' + t.id + '"></td>', '<td id="aa-sum"></td><td id="aa-q"></td><td id="aa-g"></td><td class="noprint"></td>') +
+      foot('Lösungsquote', t => '<td id="aq2-' + t.id + '"></td>', '<td colspan="4"></td>') +
+      foot('volle Punktzahl', t => '<td id="af-' + t.id + '"></td>', '<td colspan="4"></td>') +
+      foot('0 Punkte', t => '<td id="az-' + t.id + '"></td>', '<td colspan="4"></td>') +
+      '</tfoot></table></div>';
+    h += '<div class="atools noprint"><button class="btn" type="button" data-aact="addRow">+ Zeile</button>' +
+      '<button class="btn" type="button" data-aact="addRows">+ 5 Zeilen</button>' +
+      '<select id="aKlasse"><option value="">Namen aus Klasse übernehmen …</option>' +
+      klassen.map(k => '<option value="' + k.id + '">' + esc(k.name) + ' (' + k.schueler.length + ')</option>').join('') + '</select>' +
+      '<button class="btn" type="button" data-aact="toSpiegel">Summen → Notenspiegel</button>' +
+      '<button class="btn" type="button" data-aact="csv">CSV</button>' +
+      '<button class="btn" type="button" data-aact="clear">Werte leeren</button>' +
+      (kl && !S.link ? '<button class="btn primary" type="button" data-aact="toBuch">→ Summen als Arbeit ins Notenbuch (' + esc(kl.name) + ')</button>' : '') + '</div>';
+    box.innerHTML = h;
+    updateAufg(R);
+  }
+
+  // Berechnet Summen je Zeile und die Auswertung je Aufgabe (ohne Neuaufbau der Eingabefelder)
+  function aufgCalc(R){
+    const A = aufg();
+    const rows = A.rows.map(r => {
+      let sum = 0, any = false, bad = false; const v = {};
+      A.tasks.forEach(t => {
+        const raw = String(r.p[t.id] ?? '').trim(); if (raw === '') return;
+        const x = pnum(raw);
+        if (!/^\d+([.,]\d+)?$/.test(raw) || x > (+t.max || 0) + 1e-9){ bad = true; v[t.id] = null; return; }
+        v[t.id] = x; sum += x; any = true;
+      });
+      return {r, sum, any, bad, v, g: any ? gradeFor(R, Math.min(sum, R.total)).g : null};
+    });
+    const tasks = A.tasks.map(t => {
+      const xs = rows.map(o => o.v[t.id]).filter(x => x != null);
+      const max = +t.max || 0, avg = xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+      return {t, n:xs.length, avg, q: avg != null && max > 0 ? avg / max : null,
+        full: xs.filter(x => Math.abs(x - max) < 1e-9).length, zero: xs.filter(x => x === 0).length};
+    });
+    return {rows, tasks};
+  }
+
+  function updateAufg(R){
+    R = R || window.__R; const A = aufg(); if (!$('aufgBox').firstChild) return;
+    const {rows, tasks} = aufgCalc(R);
+    const setH = (id, v) => { const el = $(id); if (el) el.innerHTML = v; };
+    const kurs = S.stufe === 'kurs';
+    rows.forEach(o => {
+      setH('as-' + o.r.id, o.any ? num(o.sum) : '');
+      setH('aq-' + o.r.id, o.any ? num(o.sum / R.total * 100, 0) + ' %' : '');
+      setH('ag-' + o.r.id, o.g ? (kurs ? o.g.label + ' <small>(' + o.g.note + ')</small>' : o.g.label) : '');
+      A.tasks.forEach(t => {
+        const inp = document.querySelector('#aufgBox .ap[data-ri="' + A.rows.indexOf(o.r) + '"][data-tid="' + t.id + '"]');
+        if (inp){ const bad = o.v[t.id] === null; inp.classList.toggle('bad', bad); inp.title = bad ? 'Ungültig: 0 bis ' + num(+t.max || 0) + ' Punkte' : ''; }
+      });
+    });
+    tasks.forEach(s => {
+      setH('aa-' + s.t.id, s.avg != null ? num(s.avg, 2) : '–');
+      setH('aq2-' + s.t.id, s.q != null ? '<div class="qbar"><div style="width:' + Math.min(100, s.q * 100) + '%;background:' + quoteColor(s.q) + '"></div></div>' + num(s.q * 100, 0) + ' %' : '–');
+      setH('af-' + s.t.id, s.n ? s.full + '' : '–');
+      setH('az-' + s.t.id, s.n ? s.zero + '' : '–');
+    });
+    const done = rows.filter(o => o.any);
+    const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+    const avgSum = mean(done.map(o => o.sum)), avgG = mean(done.map(o => o.g.v));
+    setH('aa-sum', avgSum != null ? num(avgSum, 2) : '–');
+    setH('aa-q', avgSum != null ? num(avgSum / R.total * 100, 0) + ' %' : '–');
+    setH('aa-g', avgG != null ? num(avgG, 2) : '–');
+    const rated = tasks.filter(s => s.q != null).sort((a, b) => a.q - b.q);
+    let sum = '';
+    if (done.length){
+      const under = done.filter(o => o.g.v < (kurs ? 5 : 99) && (kurs ? true : o.g.v > 4)).length;
+      sum = '<b>' + done.length + '</b> ausgewertet · Ø ' + (kurs ? num(avgG, 2) + ' VP' : 'Note ' + num(avgG, 2)) +
+        ' · Ø ' + num(avgSum, 1) + ' von ' + num(R.total) + ' P' +
+        ' · unter ' + (kurs ? '05 VP' : 'Note 4') + ': <b>' + under + '</b>';
+      if (rated.length > 1){
+        const lo = rated[0], hi = rated[rated.length - 1];
+        sum += '<br>Am schwächsten gelöst: <b>' + esc(lo.t.name) + '</b> (' + num(lo.q * 100, 0) + ' %) · am besten: <b>' + esc(hi.t.name) + '</b> (' + num(hi.q * 100, 0) + ' %)';
+        const weak = rated.filter(s => s.q < 0.5).map(s => esc(s.t.name));
+        if (weak.length) sum += ' · unter 50 %: ' + weak.join(', ');
+      }
+    } else sum = '<span class="hint">Punkte je Aufgabe eintragen – Summe, Note und die Auswertung je Aufgabe erscheinen sofort.</span>';
+    setH('aSummary', sum);
+  }
+
+  function aufgEvents(){
+    const box = $('aufgBox');
+    box.addEventListener('input', e => {
+      const A = aufg(), t = e.target;
+      if (t.classList.contains('ap')){
+        const r = A.rows[+t.dataset.ri]; if (!r) return;
+        if (t.value.trim() === '') delete r.p[t.dataset.tid]; else r.p[t.dataset.tid] = t.value.trim();
+        save(); updateAufg();
+      } else if (t.classList.contains('arn')){ A.rows[+t.dataset.ri].name = t.value; save(); }
+    });
+    box.addEventListener('change', e => {
+      const A = aufg(), t = e.target;
+      if (t.classList.contains('an')){ A.tasks[+t.dataset.ti].name = t.value.trim() || 'A' + (+t.dataset.ti + 1); save(); renderAufg(window.__R); }
+      else if (t.classList.contains('am')){ const v = pnum(t.value); A.tasks[+t.dataset.ti].max = isNaN(v) || v < 0 ? 0 : v; save(); renderAufg(window.__R); }
+      else if (t.id === 'aKlasse' && t.value){
+        const k = DB.klassen.find(x => x.id === t.value);
+        if (k){
+          const hasVals = A.rows.some(r => Object.keys(r.p).length);
+          if (!hasVals || confirm('Die Tabelle wird durch die Namen aus „' + k.name + '“ ersetzt. Bereits eingetragene Punkte gehen verloren. Fortfahren?')){
+            A.rows = k.schueler.map(s => ({id:uid(), name:s.name, sid:s.id, p:{}}));
+            if (!A.rows.length) A.rows = AUFG_DEF().rows;
+            A.kid = k.id; save();
+          }
+        }
+        renderAufg(window.__R);
+      }
+    });
+    box.addEventListener('keydown', e => {
+      const t = e.target; if (!t.classList.contains('ap') || !['Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+      e.preventDefault();
+      const ri = +t.dataset.ri + (e.key === 'ArrowUp' ? -1 : 1);
+      let next = box.querySelector('.ap[data-ri="' + ri + '"][data-tid="' + t.dataset.tid + '"]');
+      if (!next && e.key === 'Enter' && ri === aufg().rows.length){ aufg().rows.push({id:uid(), name:'', p:{}}); save(); renderAufg(window.__R); next = box.querySelector('.ap[data-ri="' + ri + '"][data-tid="' + t.dataset.tid + '"]'); }
+      if (next){ next.focus(); next.select(); }
+    });
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-aact]'); if (!b) return;
+      const A = aufg(), a = b.dataset.aact, R = window.__R;
+      if (a === 'addTask'){ A.tasks.push({id:uid(), name:'A' + (A.tasks.length + 1), max:10}); }
+      else if (a === 'delTask'){
+        const t = A.tasks[A.tasks.length - 1];
+        if (A.rows.some(r => r.p[t.id] != null) && !confirm('Aufgabe „' + t.name + '“ mit den eingetragenen Punkten entfernen?')) return;
+        A.tasks.pop(); A.rows.forEach(r => delete r.p[t.id]);
+      }
+      else if (a === 'setTotal'){ cur().total = A.tasks.reduce((s, t) => s + (+t.max || 0), 0); save(); renderRechner(); return; }
+      else if (a === 'addRow') A.rows.push({id:uid(), name:'', p:{}});
+      else if (a === 'addRows') for (let i = 0; i < 5; i++) A.rows.push({id:uid(), name:'', p:{}});
+      else if (a === 'delRow'){
+        const r = A.rows[+b.dataset.ri];
+        if (Object.keys(r.p).length && !confirm('Zeile „' + (r.name || 'Nr. ' + (+b.dataset.ri + 1)) + '“ löschen?')) return;
+        A.rows.splice(+b.dataset.ri, 1);
+      }
+      else if (a === 'clear'){ if (!confirm('Alle eingetragenen Punkte leeren? (Namen und Aufgaben bleiben)')) return; A.rows.forEach(r => r.p = {}); }
+      else if (a === 'toSpiegel'){
+        const sums = aufgCalc(R).rows.filter(o => o.any).map(o => num(o.sum));
+        $('list').value = sums.join('; '); renderSpiegel(R); $('list').scrollIntoView({block:'center', behavior:'smooth'}); return;
+      }
+      else if (a === 'csv'){
+        const {rows, tasks} = aufgCalc(R), kurs = S.stufe === 'kurs';
+        const lines = [['Nr', 'Name'].concat(A.tasks.map(t => t.name + ' (max ' + num(+t.max || 0) + ')'), ['Summe', 'Prozent', kurs ? 'VP' : 'Note']).map(csvCell).join(';')];
+        rows.forEach((o, i) => lines.push([i + 1, o.r.name].concat(A.tasks.map(t => o.r.p[t.id] ?? ''), [o.any ? num(o.sum) : '', o.any ? num(o.sum / R.total * 100, 1) : '', o.g ? o.g.label : '']).map(csvCell).join(';')));
+        lines.push(['', 'Ø Punkte'].concat(tasks.map(s => s.avg != null ? num(s.avg, 2) : '')).map(csvCell).join(';'));
+        lines.push(['', 'Lösungsquote %'].concat(tasks.map(s => s.q != null ? num(s.q * 100, 1) : '')).map(csvCell).join(';'));
+        download('aufgabenauswertung.csv', '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+        return;
+      }
+      else if (a === 'toBuch'){
+        const k = DB.klassen.find(x => x.id === A.kid); if (!k) return;
+        const werte = {}, ap = {};
+        aufgCalc(R).rows.forEach(o => { if (o.any && o.r.sid && k.schueler.some(s => s.id === o.r.sid)){ werte[o.r.sid] = String(Math.round(o.sum * 100) / 100); ap[o.r.sid] = copy(o.r.p); } });
+        DB.aktiv = k.id; setView('buch');
+        openLeistung(k, null, copy(cur()), null, werte, {tasks: A.tasks.map(t => ({id:t.id, name:t.name, max:+t.max || 0})), ap});
+        return;
+      }
+      save(); renderAufg(R);
+    });
+  }
+
+  /* ---------- Ereignisse Rechner ---------- */
+  function onField(e){
+    const el = e.target, k = el.dataset.k; if (!k) return;
+    if (k === 'titel'){ S.titel = el.value; save(); renderRechner(); return; }
+    const st = cur();
+    if (el.type === 'checkbox') st[k] = el.checked;
+    else if (el.type === 'radio') st[k] = el.value;
+    else if (k === 'typ'){
+      if (el.value === 'custom'){ const R = compute(S.stufe, st); st.custom = st.custom || {}; st.custom[customKey(S.stufe, st)] = R.p.map(x => +x.toFixed(1)); }
+      st.typ = el.value;
+    } else {
+      const v = parseFloat(String(el.value).replace(',', '.'));
+      if (isNaN(v)) return;
+      st[k] = v;
+    }
+    save(); renderRechner();
+  }
+  document.querySelector('.controls').addEventListener('input', onField);
+  document.querySelector('.controls').addEventListener('change', onField);
+  $('stufeTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ S.stufe = b.dataset.stufe; save(); renderRechner(); } });
+  $('linkbar').addEventListener('click', e => { const b = e.target.closest('[data-link]'); if (b) endLink(b.dataset.link === '1'); });
+  $('calcPts').addEventListener('input', () => renderCalc(window.__R));
+  aufgEvents();
+  $('list').addEventListener('input', () => renderSpiegel(window.__R));
+  $('resetCustom').addEventListener('click', () => { const st = cur(); st.custom = st.custom || {}; st.custom[customKey(S.stufe, st)] = thresholds(S.stufe, st, 'linear').p.map(x => +x.toFixed(1)); save(); renderRechner(); });
+  $('abiPreset').addEventListener('click', () => { const st = cur(); st.custom = st.custom || {}; st.custom.kurs = ABI.slice(); save(); renderRechner(); });
+  $('resetAll').addEventListener('click', () => { if (confirm('Rechner-Einstellungen auf Standard zurücksetzen? (Das Notenbuch bleibt unverändert.)')){ const v = copy(DEF); S.mittel = v.mittel; S.kurs = v.kurs; S.titel = ''; save(); renderRechner(); } });
+  $('csvBtn').addEventListener('click', () => {
+    const R = window.__R, kurs = R.stufe === 'kurs';
+    const lines = [(kurs ? 'VP;Note' : 'Note') + ';Prozent ab;Punkte von;Punkte bis'];
+    R.rows.forEach(r => lines.push((kurs ? r.g.label + ';' + r.g.note : r.g.label) + ';' + num(r.pct, 1) + ';' + (r.na ? '' : num(r.from)) + ';' + (r.na ? '' : num(r.to))));
+    download('notenschluessel_' + R.stufe + '.csv', '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+  });
+  $('toBuch').addEventListener('click', () => {
+    let k = aktKlasse();
+    if (!k || k.stufe !== S.stufe) k = DB.klassen.find(x => x.stufe === S.stufe);
+    if (!k){ alert('Lege im Notenbuch zuerst ' + (S.stufe === 'kurs' ? 'einen Kurs der Kursstufe' : 'eine Klasse der Mittelstufe') + ' an.'); setView('buch'); return; }
+    DB.aktiv = k.id; setView('buch');
+    openLeistung(k, null, copy(cur()));
+  });
+
+  /* ============================================================
+     Ansicht wechseln
+     ============================================================ */
+  function setView(v){
+    if (entry) finishEntry(true);
+    DB.view = v; saveDB();
+    document.querySelectorAll('#appTabs button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    $('view-buch').hidden = v !== 'buch';
+    $('view-rechner').hidden = v !== 'rechner';
+    if (v === 'buch') renderBuch(); else renderRechner();
+  }
+  $('appTabs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || b.dataset.view === DB.view) return;
+    if (b.dataset.view === 'buch' && linkTarget()){
+      endLink(confirm('Die Änderungen am Notenschlüssel in die Leistung übernehmen?\n\nOK = übernehmen, Abbrechen = verwerfen'));
+      return;
+    }
+    setView(b.dataset.view);
+  });
+
+  setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+})();
+</script>
+</body>
+</html>
