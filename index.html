@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Notenbuch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2f5bd3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Notenbuch - created by Markus Seitz</title>
 <style>
   :root{
@@ -27,7 +35,7 @@
   .field{margin-bottom:14px}
   .field>label,.field>.lbl,.lbl{display:block;font-weight:600;font-size:13px;margin-bottom:5px}
   .hint{font-size:12px;color:var(--muted);margin-top:4px}
-  input[type=number],input[type=text],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+  input[type=number],input[type=text],input[type=password],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
   input:disabled{background:var(--bg);color:var(--muted)}
   input.invalid{border-color:var(--bad)}
@@ -253,6 +261,12 @@
   .aw-tab td.zero{color:#c4c9d2}
   .aw-tab td.has{font-weight:700;background:var(--accent-soft)}
   .aw-tab td.na-c{background:repeating-linear-gradient(45deg,#f4f5f7 0 4px,#fff 4px 8px)}
+  .backupbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--warn-bg);border:1px solid #f0d48a;color:var(--warn);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:14px}
+  .readybox{background:#eaf7ee;border:1px solid #b7e1c3;border-radius:10px;padding:10px 12px;margin-top:12px;font-size:13px}
+  details.help{margin-top:10px;font-size:13px}
+  details.help summary{cursor:pointer;color:var(--accent);font-weight:600}
+  details.help ul{margin:8px 0 0;padding-left:18px;color:var(--ink)}
+  details.help li{margin-bottom:6px}
   dialog::backdrop{background:rgba(20,25,35,.4)}
   .dlgform{padding:20px 22px}
   .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -311,10 +325,11 @@
       <ul id="klassenListe"></ul>
       <button class="btn primary" id="neueKlasse" type="button">+ Klasse / Kurs</button>
       <h3>Datensicherung</h3>
-      <button class="btn" id="exportJson" type="button">Sicherung herunterladen</button>
+      <div class="hint" id="backupStatus" style="margin:0 0 8px"></div>
+      <button class="btn" id="exportJson" type="button">Sicherung speichern …</button>
       <button class="btn" id="importBtn" type="button">Sicherung laden …</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
-      <div class="hint">Alle Daten liegen nur in diesem Browser auf diesem Gerät. Regelmäßig sichern!</div>
+      <div class="hint">Alle Daten liegen nur in diesem Browser auf diesem Gerät. Für den Abgleich zwischen MacBook und iPad die Sicherung in iCloud ablegen und auf dem anderen Gerät laden.</div>
     </aside>
     <section class="card" id="buchMain" style="min-width:0"></section>
   </div>
@@ -597,7 +612,12 @@
   let DB;
   try { DB = JSON.parse(localStorage.getItem('notenbuch-v1')); } catch(e) { DB = null; }
   if (!DB || !Array.isArray(DB.klassen)) DB = {klassen:[], aktiv:null, view:'buch'};
-  const saveDB = () => { try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
+  let lastSer = JSON.stringify(DB.klassen);
+  const saveDB = () => {
+    const ser = JSON.stringify(DB.klassen);
+    if (ser !== lastSer){ DB.meta = DB.meta || {}; DB.meta.changedAt = Date.now(); lastSer = ser; if (typeof renderBackupStatus === 'function') setTimeout(renderBackupStatus, 0); }
+    try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung speichern.'); }
+  };
   const aktKlasse = () => DB.klassen.find(k => k.id === DB.aktiv) || null;
 
   /* ---------- Smiley-Eingabe direkt in der Tabelle ---------- */
@@ -790,7 +810,8 @@
     const G = {}; k.kats.forEach(c => { if (isNoteKat(c)) G[c.id] = groupsOf(k, c); });
     const width = c => isNoteKat(c) ? Math.max(G[c.id].reduce((a, g) => a + g.ls.length + 1, 0), 1) : Math.max(byKat(c).length, 1);
     const eL = entryL();
-    let h = '<div class="buchhead"><div><h2>' + esc(k.name) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
+    let h = needsBackup() ? '<div class="backupbar noprint"><span>⚠ Ungesicherte Änderungen – letzte Sicherung: <b>' + agoText((DB.meta || {}).savedAt) + '</b></span><button type="button" class="btn primary" data-act="sichern">Jetzt sichern</button></div>' : '';
+    h += '<div class="buchhead"><div><h2>' + esc(k.name) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
       k.schueler.length + ' Schüler·innen · Gewichtung ' +
       k.kats.map(c => esc(c.name)).join(' : ') + ' = ' + ratioText(k.kats) +
       (k.kats.length > 1 ? ' (' + k.kats.map(c => num(wPct(k.kats, c), 1) + ' %').join(' / ') + ')' : '') + '</div></div>' +
@@ -1954,6 +1975,7 @@
     const act = e.target.closest('[data-act]');
     if (act){
       const a = act.dataset.act;
+      if (a === 'sichern') return openSicherung();
       if (a === 'entryDone') return finishEntry();
       if (a === 'entryCancel'){
         const l = entryL();
@@ -2055,27 +2077,155 @@
     if (inp){ inp.focus(); inp.select(); }
   });
 
-  $('exportJson').onclick = () => {
-    const data = {app:'notenbuch', version:1, exportiert:new Date().toISOString(), notenbuch:DB, rechner:S};
-    download('notenbuch_sicherung_' + today() + '.json', JSON.stringify(data, null, 1), 'application/json');
+  /* ============================================================
+     Datensicherung & Abgleich (Safari/iPad-tauglich)
+     ============================================================ */
+  const PREF_KEY = 'notenbuch-sicherung';
+  let BP; try { BP = JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch(e){ BP = {}; }
+  BP = Object.assign({encrypt:true, remember:false, pw:'', interval:1}, BP);
+  const saveBP = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(BP)); } catch(e){} };
+  const hasCrypto = !!(window.crypto && crypto.subtle && window.isSecureContext !== false);
+  const fmtTS = t => t ? new Date(t).toLocaleString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : 'noch nie';
+  const agoText = t => {
+    if (!t) return 'noch nie';
+    const m = Math.round((Date.now() - t) / 60000);
+    if (m < 2) return 'gerade eben'; if (m < 60) return 'vor ' + m + ' Min.';
+    const h = Math.round(m / 60); if (h < 24) return 'vor ' + h + ' Std.';
+    const d = Math.round(h / 24); return d === 1 ? 'gestern' : 'vor ' + d + ' Tagen';
   };
+  // Speicher dauerhaft anfordern (schützt vor automatischem Löschen durch den Browser, wo unterstützt)
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
+
+  const b64e = buf => { const a = new Uint8Array(buf); let s = ''; for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); return btoa(s); };
+  const b64d = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
+  async function deriveKey(pw, salt, iter){
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt', 'decrypt']);
+  }
+  async function encryptPayload(obj, pw){
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iter = 250000;
+    const key = await deriveKey(pw, salt, iter);
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(JSON.stringify(obj)));
+    return {app:'notenbuch', verschluesselt:true, enc:'AES-GCM', kdf:'PBKDF2-SHA256', iter, exportiert:obj.exportiert, geaendert:obj.geaendert, salt:b64e(salt), iv:b64e(iv), data:b64e(ct)};
+  }
+  async function decryptPayload(env, pw){
+    const key = await deriveKey(pw, b64d(env.salt), env.iter || 250000);
+    const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(env.iv)}, key, b64d(env.data));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+  const backupName = () => { const d = new Date(), p = n => String(n).padStart(2, '0');
+    return 'Notenbuch-Sicherung_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + '-' + p(d.getMinutes()) + '.json'; };
+  const needsBackup = () => {
+    const m = DB.meta || {};
+    if (!DB.klassen.length || !m.changedAt) return false;
+    if (m.savedAt && m.changedAt <= m.savedAt) return false;
+    if (!BP.interval) return false;
+    return !m.savedAt || Date.now() - m.savedAt > BP.interval * 86400000 || Date.now() - m.changedAt > BP.interval * 86400000;
+  };
+  function markSaved(){ DB.meta = DB.meta || {}; DB.meta.savedAt = Date.now(); saveDB(); renderBackupStatus(); if (DB.view === 'buch') renderBuch(); }
+  function renderBackupStatus(){
+    const el = $('backupStatus'); if (!el) return;
+    const m = DB.meta || {}, open = m.changedAt && (!m.savedAt || m.changedAt > m.savedAt);
+    el.innerHTML = 'Letzte Sicherung: <b>' + agoText(m.savedAt) + '</b>' + (open ? '<br><span style="color:var(--warn)">● ungesicherte Änderungen</span>' : (m.savedAt ? '<br><span style="color:#2e9e4f">● alles gesichert</span>' : ''));
+  }
+
+  function openSicherung(){
+    const m = DB.meta || {};
+    const canShare = !!(navigator.canShare && window.File);
+    const html =
+      '<div class="keybox" style="margin-bottom:12px"><div>Letzte Sicherung: <b>' + fmtTS(m.savedAt) + '</b></div><div>Letzte Änderung: <b>' + fmtTS(m.changedAt) + '</b></div></div>' +
+      (hasCrypto
+        ? '<label class="chk" style="font-weight:600"><input type="checkbox" id="bEnc"' + (BP.encrypt ? ' checked' : '') + '> Sicherung mit Passwort verschlüsseln (empfohlen für iCloud)</label>' +
+          '<div id="bPwBox" style="margin:8px 0 0 22px"><div class="grid2"><div class="field"><label>Passwort</label><input type="password" id="bPw" autocomplete="new-password" value="' + (BP.remember ? esc(BP.pw) : '') + '"></div>' +
+          '<div class="field"><label>Passwort wiederholen</label><input type="password" id="bPw2" autocomplete="new-password" value="' + (BP.remember ? esc(BP.pw) : '') + '"></div></div>' +
+          '<label class="chk"><input type="checkbox" id="bRem"' + (BP.remember ? ' checked' : '') + '> Passwort auf diesem Gerät merken</label>' +
+          '<div class="hint">Ohne Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen – bitte gut aufbewahren.</div></div>'
+        : '<div class="hint">Verschlüsselung ist hier nicht verfügbar (die Seite muss über https geöffnet werden).</div>') +
+      '<div class="field" style="margin-top:12px"><label for="bInt">Erinnerung an die Sicherung</label><select id="bInt">' +
+      [[1, 'täglich, wenn sich etwas geändert hat'], [3, 'alle 3 Tage'], [7, 'wöchentlich'], [0, 'nie']].map(o => '<option value="' + o[0] + '"' + (BP.interval === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>' +
+      '<details class="help"><summary>So landet die Sicherung automatisch in iCloud (MacBook &amp; iPad)</summary>' +
+      '<ul><li><b>iPad:</b> ' + (canShare ? '„Teilen / In Dateien sichern“ wählen → <i>In Dateien sichern</i> → Ordner <i>iCloud Drive › Notenbuch</i>.' : 'Herunterladen – Safari legt die Datei unter <i>Dateien › Downloads</i> ab.') + ' Alternativ in <i>Einstellungen › Apps › Safari › Downloads</i> „iCloud Drive“ wählen.</li>' +
+      '<li><b>MacBook (Safari):</b> <i>Safari › Einstellungen › Allgemein › Speicherort für Downloads</i> auf einen Ordner in <i>iCloud Drive</i> stellen – dann landet jede Sicherung automatisch in iCloud.</li>' +
+      '<li><b>Anderes Gerät:</b> „Sicherung laden …“ und die neueste Datei aus iCloud Drive wählen. Das Notenbuch zeigt an, ob sie neuer oder älter ist als der Stand auf dem Gerät.</li>' +
+      '<li><b>DuckDuckGo:</b> Die Seite unbedingt als „feuerfest“ (Fireproof) markieren – sonst löscht der Feuer-Knopf alle Noten.</li></ul></details>' +
+      '<div id="bReady"></div>';
+    openDialog('Sicherung speichern', html, [{label:'Schließen'}, {label:'Sicherung erstellen', cls:'primary', onClick:() => { make(); return false; }}]);
+    const syncPw = () => { const on = hasCrypto && dq('#bEnc').checked; if (dq('#bPwBox')) dq('#bPwBox').style.display = on ? '' : 'none'; };
+    if (hasCrypto){ dq('#bEnc').addEventListener('change', syncPw); syncPw(); }
+    dq('#bInt').addEventListener('change', e => { BP.interval = +e.target.value; saveBP(); renderBackupStatus(); });
+    async function make(){
+      const enc = hasCrypto && dq('#bEnc').checked;
+      let pw = '';
+      if (enc){
+        pw = dq('#bPw').value;
+        if (pw.length < 6){ alert('Bitte ein Passwort mit mindestens 6 Zeichen wählen.'); dq('#bPw').focus(); return; }
+        if (pw !== dq('#bPw2').value){ alert('Die beiden Passwörter stimmen nicht überein.'); dq('#bPw2').focus(); return; }
+        BP.remember = dq('#bRem').checked; BP.pw = BP.remember ? pw : '';
+      }
+      BP.encrypt = enc; saveBP();
+      const payload = {app:'notenbuch', version:2, exportiert:new Date().toISOString(), geaendert:(DB.meta || {}).changedAt || null, notenbuch:DB, rechner:S};
+      const box = dq('#bReady'); box.innerHTML = '<div class="hint">Sicherung wird erstellt …</div>';
+      let text;
+      try { text = JSON.stringify(enc ? await encryptPayload(payload, pw) : payload); }
+      catch(err){ box.innerHTML = '<div class="warn">Die Sicherung konnte nicht erstellt werden.</div>'; return; }
+      const name = backupName(), file = window.File ? new File([text], name, {type:'application/json'}) : null;
+      const shareOk = !!(file && navigator.canShare && navigator.canShare({files:[file]}));
+      box.innerHTML = '<div class="readybox"><b>✓ Sicherung bereit</b> – ' + esc(name) + ' (' + num(text.length / 1024, 0) + ' KB' + (enc ? ', verschlüsselt' : '') + ')<div class="row" style="margin-top:8px;flex-wrap:wrap">' +
+        (shareOk ? '<button type="button" class="btn primary" id="bShare">Teilen / In Dateien sichern …</button>' : '') +
+        '<button type="button" class="btn' + (shareOk ? '' : ' primary') + '" id="bDl">Herunterladen</button></div></div>';
+      if (shareOk) dq('#bShare').onclick = async () => {
+        try { await navigator.share({files:[file], title:'Notenbuch-Sicherung'}); markSaved(); box.insertAdjacentHTML('beforeend', '<div class="hint" style="color:#2e9e4f">Gesichert ✓</div>'); }
+        catch(err){ if (err && err.name !== 'AbortError') alert('Teilen nicht möglich – bitte „Herunterladen“ verwenden.'); }
+      };
+      dq('#bDl').onclick = () => { download(name, text, 'application/json'); markSaved(); box.insertAdjacentHTML('beforeend', '<div class="hint" style="color:#2e9e4f">Heruntergeladen ✓</div>'); };
+    }
+  }
+
+  function askPassword(title){
+    return new Promise(res => {
+      openDialog(title, '<div class="field"><label>Passwort der Sicherung</label><input type="password" id="rPw" value="' + (BP.remember ? esc(BP.pw) : '') + '"></div>',
+        [{label:'Abbrechen', onClick:() => { res(null); }}, {label:'Entschlüsseln', cls:'primary', onClick:() => { res(dq('#rPw').value); }}]);
+      dq('#rPw').focus();
+    });
+  }
+
+  async function restoreFrom(text){
+    let data;
+    try { data = JSON.parse(text); } catch(e){ alert('Die Datei ist keine gültige Notenbuch-Sicherung.'); return; }
+    if (data && data.verschluesselt){
+      if (!hasCrypto){ alert('Diese Sicherung ist verschlüsselt. Bitte das Notenbuch über https (z. B. GitHub Pages) öffnen, um sie zu laden.'); return; }
+      for (;;){
+        const pw = await askPassword('Verschlüsselte Sicherung vom ' + fmtTS(data.exportiert));
+        if (pw == null) return;
+        try { data = await decryptPayload(data, pw); break; }
+        catch(e){ alert('Das Passwort ist falsch.'); }
+      }
+    }
+    if (!data || !data.notenbuch || !Array.isArray(data.notenbuch.klassen)){ alert('Die Datei ist keine gültige Notenbuch-Sicherung.'); return; }
+    const local = (DB.meta || {}).changedAt, theirs = data.geaendert || Date.parse(data.exportiert) || null;
+    let msg = 'Sicherung vom ' + fmtTS(Date.parse(data.exportiert)) + ' laden?\n\n' +
+      'Stand der Sicherung: ' + fmtTS(theirs) + '\nStand auf diesem Gerät: ' + fmtTS(local) + '\n\n';
+    if (local && theirs && theirs < local && DB.klassen.length) msg += '⚠ ACHTUNG: Die Sicherung ist ÄLTER als die Daten auf diesem Gerät. Neuere Einträge gehen verloren!\n\n';
+    msg += 'Die aktuellen Daten in diesem Browser werden ersetzt.';
+    if (!confirm(msg)) return;
+    DB = data.notenbuch; DB.view = 'buch';
+    DB.meta = Object.assign({}, DB.meta, {changedAt: theirs || Date.now(), savedAt: Date.now()});
+    if (data.rechner && data.rechner.mittel && data.rechner.kurs){ S = data.rechner; delete S.link; delete S.linkBackup; save(); }
+    lastSer = JSON.stringify(DB.klassen);
+    try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){}
+    setView('buch'); renderBackupStatus();
+  }
+
+  $('exportJson').onclick = () => openSicherung();
   $('importBtn').onclick = () => $('importFile').click();
   $('importFile').onchange = e => {
     const f = e.target.files[0]; if (!f) return;
     const rd = new FileReader();
-    rd.onload = () => {
-      try {
-        const data = JSON.parse(rd.result);
-        if (!data.notenbuch || !Array.isArray(data.notenbuch.klassen)) throw new Error();
-        if (!confirm('Sicherung vom ' + (data.exportiert ? new Date(data.exportiert).toLocaleString('de-DE') : 'unbekannten Datum') + ' laden? Die aktuellen Daten in diesem Browser werden ersetzt.')) return;
-        DB = data.notenbuch; DB.view = 'buch';
-        if (data.rechner && data.rechner.mittel && data.rechner.kurs){ S = data.rechner; delete S.link; delete S.linkBackup; save(); }
-        saveDB(); setView('buch');
-      } catch(err){ alert('Die Datei ist keine gültige Notenbuch-Sicherung.'); }
-      e.target.value = '';
-    };
+    rd.onload = () => { restoreFrom(rd.result); e.target.value = ''; };
     rd.readAsText(f);
   };
+  renderBackupStatus();
+  setInterval(renderBackupStatus, 60000);
 
   /* ============================================================
      Rechner – Darstellung

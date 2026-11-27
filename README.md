@@ -27,7 +27,16 @@ Digitales Notenbuch mit integriertem Notenschlüssel-Rechner – eine einzelne H
 - Schnellrechner, Notenspiegel, Auswertung nach Aufgaben
 - Übernahme von Schlüssel und Ergebnissen ins Notenbuch
 
-## Datenspeicherung
+## Datenspeicherung & Sicherung
 
-Alle Daten werden nur lokal im Browser des jeweiligen Geräts gespeichert (localStorage). Es werden keine Daten übertragen.
-Bitte regelmäßig über **„Sicherung herunterladen“** eine Sicherungsdatei anlegen – damit lassen sich die Daten wiederherstellen oder auf ein anderes Gerät übertragen.
+Alle Daten werden nur lokal im Browser des jeweiligen Geräts gespeichert (localStorage). Es werden keine Daten an einen Server übertragen – auch nicht an GitHub.
+
+**Sicherung speichern …** erstellt eine Sicherungsdatei – auf Wunsch **mit Passwort verschlüsselt** (AES-256-GCM, PBKDF2). Auf iPad und Mac kann sie über das Teilen-Menü direkt in **iCloud Drive** abgelegt werden. Das Notenbuch erinnert an eine Sicherung, sobald es ungesicherte Änderungen gibt (Intervall einstellbar).
+
+**Abgleich zwischen Geräten (z. B. MacBook ↔ iPad):** Sicherung auf dem einen Gerät in iCloud Drive ablegen, auf dem anderen **„Sicherung laden …“** wählen. Das Notenbuch zeigt an, ob die Sicherung neuer oder älter ist als der Stand auf dem Gerät.
+
+Tipps:
+- **iPad:** Notenbuch über die Web-Adresse öffnen und mit *Teilen → Zum Home-Bildschirm* als App ablegen – so bleiben die Daten dauerhaft gespeichert.
+- **Mac (Safari):** *Ablage → Zum Dock hinzufügen*; unter *Safari → Einstellungen → Allgemein* kann der Download-Ordner auf iCloud Drive gestellt werden.
+- **DuckDuckGo:** Die Seite als „feuerfest“ (Fireproof) markieren, sonst löscht der Feuer-Knopf alle Daten.
+- Sicherungsdateien mit Noten **niemals** in dieses (öffentliche) Repository hochladen.
