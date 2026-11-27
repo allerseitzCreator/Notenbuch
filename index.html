@@ -36,7 +36,7 @@
   .field{margin-bottom:14px}
   .field>label,.field>.lbl,.lbl{display:block;font-weight:600;font-size:13px;margin-bottom:5px}
   .hint{font-size:12px;color:var(--muted);margin-top:4px}
-  input[type=number],input[type=text],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+  input[type=number],input[type=text],input[type=password],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
   input:disabled{background:var(--bg);color:var(--muted)}
   input.invalid{border-color:var(--bad)}
@@ -280,6 +280,14 @@
   #lkErr{color:var(--bad);font-size:13px;min-height:18px}
   .lockbtn{white-space:nowrap}
   @media print{#lockScreen{display:none!important}}
+  .backupbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--warn-bg);border:1px solid #f0d48a;color:var(--warn);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:14px}
+  .readybox{background:#eaf7ee;border:1px solid #b7e1c3;border-radius:10px;padding:10px 12px;margin-top:12px;font-size:13px}
+  details.help{margin-top:10px;font-size:13px}
+  details.help summary{cursor:pointer;color:var(--accent);font-weight:600}
+  details.help ul,details.help ol{margin:8px 0 0;padding-left:20px}
+  details.help li{margin-bottom:6px}
+  pre.cfg{background:#1d2330;color:#e8eefc;border-radius:8px;padding:10px;font-size:12px;overflow:auto;margin:6px 0}
+  #syncStatus a{color:var(--accent)}
   dialog::backdrop{background:rgba(20,25,35,.4)}
   .dlgform{padding:20px 22px}
   .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -343,9 +351,11 @@
       <button class="btn" id="vorlagenBtn" type="button">Vorlagen …</button>
       <button class="btn" id="importKlasse" type="button" title="CSV- oder Excel-Datei (Numbers: vorher als Excel/CSV exportieren)">Klasse importieren …</button>
       <h3>Datensicherung</h3>
-      <button class="btn" id="exportJson" type="button">Sicherung herunterladen</button>
+      <div class="hint" id="syncStatus" style="margin:0 0 8px"></div>
+      <button class="btn" id="exportJson" type="button">Sicherung speichern …</button>
       <button class="btn" id="importBtn" type="button">Sicherung laden …</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <button class="btn" id="syncBtn" type="button">Synchronisierung …</button>
       <div class="hint">Alle Daten liegen nur in diesem Browser auf diesem Gerät. Regelmäßig sichern!</div>
       <div class="hint" id="offlineStatus" style="margin-top:8px"></div>
       <h3>Passwortschutz</h3>
@@ -681,7 +691,7 @@
   try { DB = LOCK ? null : JSON.parse(localStorage.getItem('notenbuch-v1')); } catch(e) { DB = null; }
   if (!DB || !Array.isArray(DB.klassen)) DB = {klassen:[], aktiv:null, view:'buch'};
   if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
-  const saveDB = () => { if (LOCK){ if (DEK) persistEnc(); return; } try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
+  const saveDB = () => { trackChange(); if (LOCK){ if (DEK) persistEnc(); return; } try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
   const aktKlasse = () => DB.klassen.find(k => k.id === DB.aktiv) || null;
 
   /* ---------- Smiley-Eingabe direkt in der Tabelle ---------- */
@@ -875,7 +885,9 @@
     const G = {}; k.kats.forEach(c => { if (isNoteKat(c)) G[c.id] = groupsOf(k, c); });
     const width = c => isNoteKat(c) ? Math.max(G[c.id].reduce((a, g) => a + g.ls.length + 1, 0), 1) : Math.max(byKat(c).length, 1);
     const eL = entryL();
-    let h = '<div class="buchhead"><div><h2>' + esc(k.name) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
+    let h = needsBackup() ? '<div class="backupbar noprint"><span>⚠ Ungesicherte Änderungen – letzte Sicherung: <b>' + agoText(SY.meta.savedAt) + '</b></span><button type="button" class="btn primary" data-act="sichern">Jetzt sichern</button></div>' : '';
+    if (SY.mode === 'nas' && syncState.err) h += '<div class="backupbar noprint" style="background:var(--bad-bg);color:var(--bad);border-color:#f3c2bd"><span>⚠ NAS-Synchronisierung: ' + esc(syncState.err) + '</span><button type="button" class="btn" data-act="syncset">Einstellungen</button></div>';
+    h += '<div class="buchhead"><div><h2>' + esc(k.name) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
       k.schueler.length + ' Schüler·innen · Gewichtung ' +
       k.kats.map(c => esc(c.name)).join(' : ') + ' = ' + ratioText(k.kats) +
       (k.kats.length > 1 ? ' (' + k.kats.map(c => num(wPct(k.kats, c), 1) + ' %').join(' / ') + ')' : '') + '</div></div>' +
@@ -2364,6 +2376,8 @@
     const act = e.target.closest('[data-act]');
     if (act){
       const a = act.dataset.act;
+      if (a === 'sichern') return openSicherung();
+      if (a === 'syncset') return openSync();
       if (a === 'entryDone') return finishEntry();
       if (a === 'entryCancel'){
         const l = entryL();
@@ -2465,27 +2479,6 @@
     if (inp){ inp.focus(); inp.select(); }
   });
 
-  $('exportJson').onclick = () => {
-    const data = {app:'notenbuch', version:1, exportiert:new Date().toISOString(), notenbuch:DB, rechner:S};
-    download('notenbuch_sicherung_' + today() + '.json', JSON.stringify(data, null, 1), 'application/json');
-  };
-  $('importBtn').onclick = () => $('importFile').click();
-  $('importFile').onchange = e => {
-    const f = e.target.files[0]; if (!f) return;
-    const rd = new FileReader();
-    rd.onload = () => {
-      try {
-        const data = JSON.parse(rd.result);
-        if (!data.notenbuch || !Array.isArray(data.notenbuch.klassen)) throw new Error();
-        if (!confirm('Sicherung vom ' + (data.exportiert ? new Date(data.exportiert).toLocaleString('de-DE') : 'unbekannten Datum') + ' laden? Die aktuellen Daten in diesem Browser werden ersetzt.')) return;
-        DB = data.notenbuch; DB.view = 'buch';
-        if (data.rechner && data.rechner.mittel && data.rechner.kurs){ S = data.rechner; delete S.link; delete S.linkBackup; save(); }
-        saveDB(); setView('buch');
-      } catch(err){ alert('Die Datei ist keine gültige Notenbuch-Sicherung.'); }
-      e.target.value = '';
-    };
-    rd.readAsText(f);
-  };
 
   /* ============================================================
      Rechner – Darstellung
@@ -2882,7 +2875,9 @@
     if (data.s && data.s.mittel && data.s.kurs) S = data.s;
     lockEl.hidden = true; document.body.classList.remove('locked');
     lastAct = Date.now(); updateLockUI();
+    resetTracking(); await loadSecrets();
     setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+    renderSyncStatus(); scheduleSync(1500);
   }
   async function unlockPw(){
     const pw = $('lkPw').value; if (!pw) return;
@@ -2912,7 +2907,7 @@
     if (!LOCK || !DEK) return;
     if (entry) finishEntry(true);
     await persistEnc();
-    DEK = null; DEKraw = null;
+    DEK = null; DEKraw = null; SEC = null; clearTimeout(syncTimer);
     DB = {klassen:[], aktiv:null, view:DB.view, vorlagen:[]}; S = copy(DEF);
     if ($('list')) $('list').value = '';
     if ($('calcPts')) $('calcPts').value = '';
@@ -2988,6 +2983,7 @@
             LOCK = {v:1, timeout:to, pw: await sealPw(pw), data:null};
             await persistEnc();
             try { localStorage.removeItem('notenbuch-v1'); localStorage.removeItem('notenschluessel-v1'); } catch(e){}
+            await saveSecrets();
             lastAct = Date.now(); updateLockUI();
             if (wantBio){
               openDialog('Passwortschutz ist eingeschaltet', '<div class="readybox">✓ Deine Noten werden jetzt verschlüsselt gespeichert.</div><div id="sBioBox2" style="margin-top:12px"></div>', [{label:'Fertig', cls:'primary'}]);
@@ -3033,15 +3029,342 @@
       if (!confirm('Passwortschutz wirklich ausschalten? Die Noten werden danach unverschlüsselt auf diesem Gerät gespeichert.')) return;
       encSeq++; LOCK = null; DEK = null; DEKraw = null;
       try { localStorage.removeItem(ENC_KEY); } catch(e){}
-      save(); saveDB(); updateLockUI(); dlg.close();
+      save(); saveDB(); await saveSecrets(); updateLockUI(); dlg.close();
       alert('Passwortschutz ist ausgeschaltet.');
     };
   }
   $('schutzBtn').onclick = () => openSchutz();
   updateLockUI();
 
+  /* ============================================================
+     Datensicherung & Synchronisierung
+     Option 1: iCloud Drive (Sicherung von Hand, verschlüsselt, mit Erinnerung)
+     Option 2: Synology-NAS (automatisch über WebDAV, verschlüsselt)
+     ============================================================ */
+  const SY_KEY = 'notenbuch-sync';
+  let SY; try { SY = JSON.parse(localStorage.getItem(SY_KEY)) || {}; } catch(e){ SY = {}; }
+  SY = Object.assign({mode:'aus', remind:1, nas:{url:'', user:'', auto:true}, meta:{}}, SY);
+  SY.nas = Object.assign({url:'', user:'', auto:true}, SY.nas); SY.meta = SY.meta || {};
+  const saveSY = () => { try { localStorage.setItem(SY_KEY, JSON.stringify(SY)); } catch(e){} };
+  let SEC = null;                       // {pass, syncpw} – Zugangsdaten, nur im Speicher
+  let syncState = {busy:false, err:'', at:0};
+  const fmtTS = t => t ? new Date(t).toLocaleString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : 'noch nie';
+  const agoText = t => {
+    if (!t) return 'noch nie';
+    const m = Math.round((Date.now() - t) / 60000);
+    if (m < 2) return 'gerade eben'; if (m < 60) return 'vor ' + m + ' Min.';
+    const h = Math.round(m / 60); if (h < 24) return 'vor ' + h + ' Std.';
+    const d = Math.round(h / 24); return d === 1 ? 'gestern' : 'vor ' + d + ' Tagen';
+  };
+
+  // --- Zugangsdaten (bei Passwortschutz verschlüsselt abgelegt) ---
+  async function saveSecrets(){
+    if (!SEC){ delete SY.secret; delete SY.secretBox; saveSY(); return; }
+    if (LOCK && DEK){ SY.secretBox = await seal(DEK, TE.encode(JSON.stringify(SEC))); delete SY.secret; }
+    else if (!LOCK){ SY.secret = SEC; delete SY.secretBox; }
+    saveSY();
+  }
+  async function loadSecrets(){
+    if (SY.secret) SEC = SY.secret;
+    else if (SY.secretBox && DEK){ try { SEC = JSON.parse(TD.decode(await unseal(DEK, SY.secretBox))); } catch(e){ SEC = null; } }
+    if (SEC && LOCK && DEK && SY.secret) await saveSecrets();
+  }
+
+  // --- Änderungen erkennen ---
+  const dataSer = () => JSON.stringify([DB.klassen, DB.vorlagen]);
+  let lastSer = null;
+  function trackChange(){
+    if (isLocked()) return;
+    const s = dataSer();
+    if (lastSer === null){ lastSer = s; return; }
+    if (s === lastSer) return;
+    lastSer = s;
+    DB.meta = DB.meta || {}; DB.meta.changedAt = Date.now();
+    SY.meta.dirty = true; saveSY();
+    setTimeout(() => { renderSyncStatus(); scheduleSync(5000); }, 0);
+  }
+  const resetTracking = () => { lastSer = dataSer(); };
+
+  // --- Verschlüsselung für Sicherungs- und Sync-Dateien (Passwort, auf allen Geräten gleich) ---
+  const keyCacheS = new Map();
+  async function fileKey(pw, saltB64, iter){
+    const id = pw + '|' + saltB64 + '|' + iter;
+    if (!keyCacheS.has(id)) keyCacheS.set(id, await kekFromPw(pw, b64d(saltB64), iter));
+    return keyCacheS.get(id);
+  }
+  async function encFile(obj, pw, extra){
+    const salt = b64e(rnd(16)), key = await fileKey(pw, salt, PW_ITER);
+    const box = await seal(key, TE.encode(JSON.stringify(obj)));
+    return Object.assign({verschluesselt:true, iter:PW_ITER, salt}, extra || {}, box);
+  }
+  async function decFile(env, pw){ return JSON.parse(TD.decode(await unseal(await fileKey(pw, env.salt, env.iter || PW_ITER), env))); }
+  const payloadNow = () => ({db:DB, s:S});
+  function applyPayload(data, keepView){
+    const view = DB.view, aktiv = DB.aktiv;
+    DB = data.db || data.notenbuch; if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
+    if (keepView){ DB.view = view; if (DB.klassen.some(k => k.id === aktiv)) DB.aktiv = aktiv; }
+    const s = data.s || data.rechner;
+    if (s && s.mittel && s.kurs){ S = s; delete S.link; delete S.linkBackup; }
+    resetTracking();
+    save(); saveDB();
+  }
+
+  /* ---------- Option 1: Sicherung speichern / laden (iCloud Drive) ---------- */
+  const backupName = () => { const d = new Date(), p = n => String(n).padStart(2, '0');
+    return 'Notenbuch-Sicherung_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + '-' + p(d.getMinutes()) + '.json'; };
+  function needsBackup(){
+    if (SY.mode !== 'icloud' || !+SY.remind || !DB.klassen.length) return false;
+    const ch = (DB.meta || {}).changedAt, sv = SY.meta.savedAt;
+    if (!ch || (sv && ch <= sv)) return false;
+    return !sv || Date.now() - sv > SY.remind * 86400000 || Date.now() - ch > SY.remind * 86400000;
+  }
+  function openSicherung(){
+    const canShare = !!(navigator.canShare && window.File);
+    const html = '<div class="keybox" style="margin-bottom:12px"><div>Letzte Sicherung: <b>' + fmtTS(SY.meta.savedAt) + '</b></div><div>Letzte Änderung: <b>' + fmtTS((DB.meta || {}).changedAt) + '</b></div></div>' +
+      '<label class="chk" style="font-weight:600"><input type="checkbox" id="bEnc" checked> mit Passwort verschlüsseln (empfohlen)</label>' +
+      '<div id="bPwBox" style="margin:8px 0 0 22px"><div class="grid2"><div class="field"><label>Passwort für die Sicherung</label><input type="password" id="bPw" autocomplete="new-password"></div>' +
+      '<div class="field"><label>Passwort wiederholen</label><input type="password" id="bPw2" autocomplete="new-password"></div></div>' +
+      '<div class="hint">Am besten dasselbe Passwort wie für den Passwortschutz. Ohne Passwort lässt sich die Sicherung nicht laden.</div></div>' +
+      '<details class="help"><summary>So kommt die Sicherung in iCloud Drive</summary><ul>' +
+      '<li><b>iPad / iPhone:</b> ' + (canShare ? '„Teilen / In Dateien sichern“ → <i>In Dateien sichern</i> → <i>iCloud Drive › Notenbuch</i>.' : '„Herunterladen“ – die Datei liegt dann in der Dateien-App unter <i>Downloads</i>.') + '</li>' +
+      '<li><b>Mac:</b> „Teilen“ → <i>In Dateien sichern</i> bzw. „Herunterladen“. Tipp: In Safari unter <i>Einstellungen › Allgemein › Speicherort für Downloads</i> einen Ordner in iCloud Drive wählen.</li>' +
+      '<li><b>Anderes Gerät:</b> „Sicherung laden …“ und die neueste Datei aus iCloud Drive wählen.</li></ul></details><div id="bReady"></div>';
+    openDialog('Sicherung speichern', html, [{label:'Schließen'}, {label:'Sicherung erstellen', cls:'primary', onClick:() => { make(); return false; }}]);
+    dq('#bEnc').addEventListener('change', e => { dq('#bPwBox').style.display = e.target.checked ? '' : 'none'; });
+    async function make(){
+      const enc = dq('#bEnc').checked; let pw = '';
+      if (enc){
+        pw = dq('#bPw').value;
+        if (pw.length < 6){ alert('Bitte ein Passwort mit mindestens 6 Zeichen wählen.'); dq('#bPw').focus(); return; }
+        if (pw !== dq('#bPw2').value){ alert('Die beiden Passwörter stimmen nicht überein.'); dq('#bPw2').focus(); return; }
+      } else if (!confirm('Die Sicherung wird UNVERSCHLÜSSELT gespeichert – jeder mit Zugriff auf die Datei kann die Noten lesen. Fortfahren?')) return;
+      const box = dq('#bReady'); box.innerHTML = '<div class="hint">Sicherung wird erstellt …</div>';
+      const meta = {app:'notenbuch', version:3, exportiert:new Date().toISOString(), geaendert:(DB.meta || {}).changedAt || null};
+      let text;
+      try { text = JSON.stringify(enc ? await encFile(payloadNow(), pw, meta) : Object.assign(meta, {notenbuch:DB, rechner:S})); }
+      catch(err){ box.innerHTML = '<div class="warn">Die Sicherung konnte nicht erstellt werden.</div>'; return; }
+      const name = backupName(), file = window.File ? new File([text], name, {type:'application/json'}) : null;
+      const shareOk = !!(file && navigator.canShare && navigator.canShare({files:[file]}));
+      box.innerHTML = '<div class="readybox"><b>✓ Sicherung bereit</b> – ' + esc(name) + (enc ? ' (verschlüsselt)' : '') + '<div class="row" style="margin-top:8px;flex-wrap:wrap">' +
+        (shareOk ? '<button type="button" class="btn primary" id="bShare">Teilen / In Dateien sichern …</button>' : '') +
+        '<button type="button" class="btn' + (shareOk ? '' : ' primary') + '" id="bDl">Herunterladen</button></div></div>';
+      const done = t => { SY.meta.savedAt = Date.now(); saveSY(); renderSyncStatus(); if (DB.view === 'buch') renderBuch(); box.insertAdjacentHTML('beforeend', '<div class="hint" style="color:#2e9e4f">' + t + ' ✓</div>'); };
+      if (shareOk) dq('#bShare').onclick = async () => {
+        try { await navigator.share({files:[file], title:'Notenbuch-Sicherung'}); done('Gesichert'); }
+        catch(err){ if (err && err.name !== 'AbortError') alert('Teilen nicht möglich – bitte „Herunterladen“ verwenden.'); }
+      };
+      dq('#bDl').onclick = () => { download(name, text, 'application/json'); done('Heruntergeladen'); };
+    }
+  }
+  function askPassword(title, hint){
+    return new Promise(res => {
+      openDialog(title, (hint ? '<p class="hint" style="margin-top:0">' + hint + '</p>' : '') + '<div class="field"><label>Passwort</label><input type="password" id="rPw" autocomplete="current-password"></div>',
+        [{label:'Abbrechen', onClick:() => { res(null); }}, {label:'OK', cls:'primary', onClick:() => { res(dq('#rPw').value); }}]);
+      setTimeout(() => dq('#rPw') && dq('#rPw').focus(), 30);
+    });
+  }
+  async function restoreFrom(text){
+    let data;
+    try { data = JSON.parse(text); } catch(e){ return alert('Die Datei ist keine gültige Notenbuch-Sicherung.'); }
+    const theirs = data.geaendert || Date.parse(data.exportiert) || null, exp = Date.parse(data.exportiert);
+    if (data.verschluesselt){
+      for (;;){
+        const pw = await askPassword('Verschlüsselte Sicherung vom ' + fmtTS(exp)); if (pw == null) return;
+        try { data = await decFile(data, pw); break; } catch(e){ alert('Das Passwort ist falsch.'); }
+      }
+    }
+    const db = data.db || data.notenbuch;
+    if (!db || !Array.isArray(db.klassen)) return alert('Die Datei ist keine gültige Notenbuch-Sicherung.');
+    const local = (DB.meta || {}).changedAt;
+    let msg = 'Sicherung laden?\n\nStand der Sicherung: ' + fmtTS(theirs) + '\nStand auf diesem Gerät: ' + fmtTS(local) + '\n\n';
+    if (local && theirs && theirs < local && DB.klassen.length) msg += '⚠ ACHTUNG: Die Sicherung ist ÄLTER als die Daten auf diesem Gerät – neuere Einträge gehen verloren!\n\n';
+    msg += 'Die aktuellen Daten auf diesem Gerät werden ersetzt.';
+    if (!confirm(msg)) return;
+    if (entry) finishEntry(true);
+    applyPayload(data, false);
+    DB.view = 'buch'; SY.meta.dirty = true; saveSY(); saveDB();
+    setView('buch'); renderSyncStatus(); scheduleSync(1000);
+  }
+  $('exportJson').onclick = () => openSicherung();
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { restoreFrom(rd.result); e.target.value = ''; };
+    rd.readAsText(f);
+  };
+
+  /* ---------- Option 2: Synology-NAS (WebDAV) ---------- */
+  const SYNC_FILE = 'notenbuch-sync.json';
+  const nasUrl = () => SY.nas.url.trim().replace(/\/?$/, '/') + SYNC_FILE;
+  async function nasFetch(method, body){
+    const auth = 'Basic ' + btoa(unescape(encodeURIComponent(SY.nas.user + ':' + (SEC ? SEC.pass : ''))));
+    const headers = {'Authorization':auth};
+    if (body) headers['Content-Type'] = 'application/json';
+    return fetch(nasUrl() + (method === 'GET' ? '?t=' + Date.now() : ''), {method, headers, body, cache:'no-store', credentials:'omit'});
+  }
+  const nasError = (e, status) => {
+    if (status === 401) return 'Benutzername oder Passwort der NAS ist falsch.';
+    if (status === 403) return 'Kein Schreibrecht im NAS-Ordner.';
+    if (status === 404) return 'Ordner auf der NAS nicht gefunden – Adresse prüfen.';
+    if (status) return 'Die NAS antwortet mit Fehler ' + status + '.';
+    if (e && e.name === 'OperationError') return 'Das Sync-Passwort stimmt nicht mit dem der anderen Geräte überein.';
+    return 'Keine Verbindung zur NAS – Netzwerk, Adresse (https) oder CORS-Einstellung prüfen.';
+  };
+  let syncTimer = null;
+  function scheduleSync(ms){
+    if (SY.mode !== 'nas' || !SY.nas.auto || !SEC || isLocked()) return;
+    clearTimeout(syncTimer); syncTimer = setTimeout(() => doSync(false), ms || 3000);
+  }
+  async function push(rev){
+    const env = await encFile(payloadNow(), SEC.syncpw, {app:'notenbuch-sync', v:1, rev, geaendert:(DB.meta || {}).changedAt || Date.now(), geraet:navigator.platform || ''});
+    const r = await nasFetch('PUT', JSON.stringify(env));
+    if (!r.ok) throw {status:r.status};
+    SY.meta.rev = rev; SY.meta.dirty = false; saveSY();
+  }
+  async function pull(env){
+    const data = await decFile(env, SEC.syncpw);
+    if (entry) finishEntry(true);
+    applyPayload(data, true);
+    SY.meta.rev = env.rev; SY.meta.dirty = false; saveSY();
+    if (!dlg.open) setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+  }
+  async function doSync(manual){
+    if (SY.mode !== 'nas' || !SEC || isLocked() || syncState.busy) return;
+    if (!manual && (dlg.open || entry)) return scheduleSync(10000);   // nicht mitten in einer Eingabe
+    syncState.busy = true; syncState.err = ''; renderSyncStatus();
+    try {
+      const r = await nasFetch('GET');
+      if (r.status === 404) await push(1);
+      else if (!r.ok) throw {status:r.status};
+      else {
+        const env = await r.json();
+        if (env.rev === SY.meta.rev){ if (SY.meta.dirty) await push(env.rev + 1); }
+        else if (!SY.meta.dirty) await pull(env);
+        else {
+          syncState.busy = false;
+          const choice = await conflictDialog(env);
+          syncState.busy = true;
+          if (choice === 'nas') await pull(env);
+          else if (choice === 'hier') await push((env.rev || 0) + 1);
+          else { syncState.err = 'Abgleich offen – auf beiden Geräten geändert.'; }
+        }
+      }
+      syncState.at = Date.now(); SY.meta.syncedAt = syncState.at; saveSY();
+    } catch(e){ syncState.err = nasError(e, e && e.status); }
+    syncState.busy = false; renderSyncStatus();
+  }
+  function conflictDialog(env){
+    return new Promise(res => {
+      openDialog('Abgleich mit der NAS',
+        '<p style="margin-top:0">Die Daten wurden <b>auf diesem Gerät und auf einem anderen Gerät</b> geändert. Welcher Stand soll gelten?</p>' +
+        '<div class="keybox"><div>Stand auf der NAS: <b>' + fmtTS(env.geaendert) + '</b></div><div>Stand auf diesem Gerät: <b>' + fmtTS((DB.meta || {}).changedAt) + '</b></div></div>' +
+        '<p class="hint">Der andere Stand wird überschrieben. Tipp: Vorher „Sicherung speichern“, wenn du unsicher bist.</p>',
+        [{label:'Später entscheiden', onClick:() => res('spaeter')},
+         {label:'NAS-Stand übernehmen', onClick:() => res('nas')},
+         {label:'Diesen Stand behalten', cls:'primary', onClick:() => res('hier')}]);
+    });
+  }
+  setInterval(() => scheduleSync(100), 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleSync(800); });
+  window.addEventListener('online', () => scheduleSync(800));
+
+  /* ---------- Einstellungen „Synchronisierung“ ---------- */
+  const httpsOk = /^https:$/.test(location.protocol);
+  function openSync(){
+    const yml = 'directory: /data\npermissions: CRUD\ncors:\n  enabled: true\n  credentials: true\n  allow_private_network: true\n  allowed_hosts:\n    - ' + location.origin +
+      '\n  allowed_headers:\n    - Authorization\n    - Content-Type\n  allowed_methods:\n    - GET\n    - PUT\n    - OPTIONS\nusers:\n  - username: notenbuch\n    password: BITTE-EIGENES-PASSWORT';
+    const html =
+      '<div class="field"><span class="lbl">Wie sollen MacBook und iPad abgeglichen werden?</span><div class="modi">' +
+      [['aus', 'Kein Abgleich', 'Jedes Gerät hat seine eigenen Daten.'],
+       ['icloud', 'iCloud Drive – von Hand', 'Sicherung verschlüsselt in iCloud Drive speichern und auf dem anderen Gerät laden. Mit Erinnerung.'],
+       ['nas', 'Synology-NAS – automatisch', 'Abgleich im Hintergrund über WebDAV, verschlüsselt. Einmalige Einrichtung an der NAS nötig.']]
+        .map(o => '<label class="modus"><input type="radio" name="syMode" value="' + o[0] + '"' + (SY.mode === o[0] ? ' checked' : '') + '><span><b>' + o[1] + '</b><small>' + o[2] + '</small></span></label>').join('') + '</div></div>' +
+      '<div id="syIcloud"><div class="field"><label>Erinnerung an die Sicherung</label><select id="syRemind">' +
+        [[1, 'täglich, wenn sich etwas geändert hat'], [3, 'alle 3 Tage'], [7, 'wöchentlich'], [0, 'nie']].map(o => '<option value="' + o[0] + '"' + (+SY.remind === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+        '</select></div><div class="hint">Gesichert wird über „Sicherung speichern …“ in der Seitenleiste.</div></div>' +
+      '<div id="syNas">' + (httpsOk ? '' : '<div class="warn">Die NAS-Synchronisierung funktioniert nur in der App bzw. über die Web-Adresse (https).</div>') +
+        '<div class="field"><label>WebDAV-Adresse des Ordners</label><input type="text" id="nUrl" value="' + esc(SY.nas.url) + '" placeholder="https://deinname.synology.me:8443/" autocapitalize="off" spellcheck="false"></div>' +
+        '<div class="grid2"><div class="field"><label>Benutzer (NAS)</label><input type="text" id="nUser" value="' + esc(SY.nas.user) + '" autocapitalize="off" spellcheck="false"></div>' +
+        '<div class="field"><label>Passwort (NAS)</label><input type="password" id="nPass" value="' + esc(SEC ? SEC.pass : '') + '" autocomplete="off"></div></div>' +
+        '<div class="field"><label>Sync-Passwort (auf allen Geräten gleich)</label><input type="password" id="nSync" value="' + esc(SEC ? SEC.syncpw : '') + '" autocomplete="off">' +
+        '<div class="hint">Damit wird die Datei auf der NAS verschlüsselt. Die NAS selbst kann die Noten nicht lesen.</div></div>' +
+        '<label class="chk"><input type="checkbox" id="nAuto"' + (SY.nas.auto ? ' checked' : '') + '> automatisch synchronisieren (beim Öffnen, nach Änderungen, jede Minute)</label>' +
+        '<div class="row" style="margin-top:10px;flex-wrap:wrap"><button type="button" class="btn" id="nTest">Verbindung testen</button><span class="hint" id="nMsg" style="margin:0"></span></div>' +
+        '<details class="help"><summary>Einrichtung auf der Synology (einmalig)</summary><ol>' +
+          '<li>Im <b>Paket-Zentrum</b> den <b>Container Manager</b> installieren.</li>' +
+          '<li>Einen Ordner anlegen, z. B. <code>docker/notenbuch</code> mit Unterordner <code>data</code>.</li>' +
+          '<li>Darin die Datei <code>config.yml</code> mit folgendem Inhalt anlegen (Passwort ändern):<pre class="cfg">' + esc(yml) + '</pre><button type="button" class="btn" id="nCopy">Konfiguration kopieren</button></li>' +
+          '<li>Im Container Manager das Abbild <b>hacdias/webdav</b> herunterladen und einen Container starten: Port <code>6065</code>, Ordner <code>docker/notenbuch/data</code> → <code>/data</code>, <code>config.yml</code> → <code>/config.yml</code>, Befehl <code>-c /config.yml</code>.</li>' +
+          '<li>Unter <b>Systemsteuerung › Anmeldeportal › Erweitert › Reverse Proxy</b> eine Regel anlegen: Quelle <code>HTTPS</code>, dein DDNS-Name (z. B. <code>deinname.synology.me</code>), Port <code>8443</code> → Ziel <code>HTTP localhost 6065</code>. Ein gültiges Zertifikat (z. B. Let’s Encrypt) muss diesem Namen zugeordnet sein.</li>' +
+          '<li>Für den Abgleich auch außerhalb von zu Hause am Router Port <code>8443</code> zur NAS weiterleiten (oder VPN nutzen).</li>' +
+          '<li>Hier eintragen: Adresse <code>https://deinname.synology.me:8443/</code>, Benutzer <code>notenbuch</code> und das Passwort aus der config.yml – dann „Verbindung testen“.</li></ol>' +
+          '<p class="hint">Auf jedem Gerät (MacBook, iPad) dieselben Angaben und dasselbe Sync-Passwort eintragen.</p></details></div>';
+    openDialog('Synchronisierung', html, [{label:'Abbrechen'}, {label:'Speichern', cls:'primary', onClick:() => { commit(); return false; }}], true);
+    const show = () => { const m = dlg.querySelector('input[name=syMode]:checked').value; dq('#syIcloud').hidden = m !== 'icloud'; dq('#syNas').hidden = m !== 'nas'; };
+    dlg.querySelectorAll('input[name=syMode]').forEach(r => r.addEventListener('change', show)); show();
+    const readNas = () => ({url:dq('#nUrl').value.trim(), user:dq('#nUser').value.trim(), pass:dq('#nPass').value, syncpw:dq('#nSync').value, auto:dq('#nAuto').checked});
+    if (dq('#nCopy')) dq('#nCopy').onclick = () => { try { navigator.clipboard.writeText(yml); dq('#nCopy').textContent = '✓ kopiert'; } catch(e){} };
+    dq('#nTest').onclick = async () => {
+      const n = readNas(), msg = dq('#nMsg');
+      if (!/^https:\/\//i.test(n.url)){ msg.textContent = 'Bitte eine https-Adresse eingeben.'; return; }
+      msg.textContent = 'Teste …';
+      const oldNas = SY.nas, oldSec = SEC;
+      SY.nas = Object.assign({}, SY.nas, {url:n.url, user:n.user}); SEC = {pass:n.pass, syncpw:n.syncpw};
+      try {
+        const r = await nasFetch('GET');
+        if (r.ok){
+          const env = await r.json();
+          try { await decFile(env, n.syncpw); msg.innerHTML = '<span style="color:#2e9e4f">✓ Verbindung OK – Daten auf der NAS gefunden (Stand ' + fmtTS(env.geaendert) + ').</span>'; }
+          catch(e){ msg.textContent = 'Verbindung OK, aber das Sync-Passwort passt nicht zur Datei auf der NAS.'; }
+        } else if (r.status === 404) msg.innerHTML = '<span style="color:#2e9e4f">✓ Verbindung OK – noch keine Daten auf der NAS (werden beim Speichern angelegt).</span>';
+        else msg.textContent = nasError(null, r.status);
+      } catch(e){ msg.textContent = nasError(e); }
+      SY.nas = oldNas; SEC = oldSec;
+    };
+    async function commit(){
+      const mode = dlg.querySelector('input[name=syMode]:checked').value;
+      if (mode === 'nas'){
+        const n = readNas();
+        if (!/^https:\/\//i.test(n.url)){ alert('Bitte die WebDAV-Adresse mit https:// eingeben.'); return; }
+        if (!n.user || !n.pass){ alert('Bitte Benutzer und Passwort der NAS eingeben.'); return; }
+        if ((n.syncpw || '').length < 6){ alert('Bitte ein Sync-Passwort mit mindestens 6 Zeichen wählen (auf allen Geräten gleich).'); return; }
+        const changedTarget = n.url !== SY.nas.url || n.user !== SY.nas.user || !SEC || n.syncpw !== SEC.syncpw;
+        SY.nas = {url:n.url, user:n.user, auto:n.auto};
+        SEC = {pass:n.pass, syncpw:n.syncpw};
+        if (changedTarget){ SY.meta.rev = null; SY.meta.dirty = DB.klassen.length > 0; }
+      } else { SEC = null; }
+      SY.mode = mode; SY.remind = +dq('#syRemind').value;
+      await saveSecrets(); saveSY();
+      dlg.close(); renderSyncStatus(); renderBuch();
+      if (mode === 'nas') doSync(true);
+    }
+  }
+
+  /* ---------- Statusanzeige ---------- */
+  function renderSyncStatus(){
+    const el = $('syncStatus'); if (!el) return;
+    const m = DB.meta || {}, open = m.changedAt && (!SY.meta.savedAt || m.changedAt > SY.meta.savedAt);
+    let h = '';
+    if (SY.mode === 'icloud') h = 'iCloud Drive · letzte Sicherung: <b>' + agoText(SY.meta.savedAt) + '</b>' + (open ? '<br><span style="color:var(--warn)">● ungesicherte Änderungen</span>' : '');
+    else if (SY.mode === 'nas'){
+      if (isLocked()) h = 'NAS · gesperrt';
+      else if (!SEC) h = '<span style="color:var(--warn)">● NAS: Zugangsdaten fehlen</span>';
+      else if (syncState.busy) h = 'NAS · ⟳ synchronisiere …';
+      else if (syncState.err) h = '<span style="color:var(--bad)">● NAS: ' + esc(syncState.err) + '</span>';
+      else h = 'NAS · <span style="color:#2e9e4f">●</span> synchronisiert ' + agoText(SY.meta.syncedAt) + (SY.meta.dirty ? ' · Änderungen ausstehend' : '');
+      if (!isLocked() && SEC) h += ' · <a href="#" id="syncNow">jetzt</a>';
+    } else h = 'Kein Abgleich eingerichtet';
+    el.innerHTML = h;
+    const a = $('syncNow'); if (a) a.onclick = e => { e.preventDefault(); doSync(true); };
+  }
+  $('syncBtn').onclick = () => openSync();
+  setInterval(renderSyncStatus, 60000);
+
+  if (!LOCK){ resetTracking(); loadSecrets(); }
   setView(DB.view === 'rechner' ? 'rechner' : 'buch');
-  if (LOCK) showLock();
+  renderSyncStatus();
+  if (LOCK) showLock(); else scheduleSync(1500);
 })();
 </script>
 </body>
