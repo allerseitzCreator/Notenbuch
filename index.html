@@ -3300,7 +3300,7 @@
         .map(o => '<label class="modus"><input type="radio" name="syMode" value="' + o[0] + '"' + (SY.mode === o[0] ? ' checked' : '') + '><span><b>' + o[1] + '</b><small>' + o[2] + '</small></span></label>').join('') + '</div></div>' +
       '<div id="syIcloud">' + folderBox('syFolder', 'Ablageordner in iCloud Drive (wird beim Speichern und Laden angezeigt):') + '<div class="field"><label>Erinnerung an die Sicherung</label><select id="syRemind">' +
         [[1, 'täglich, wenn sich etwas geändert hat'], [3, 'alle 3 Tage'], [7, 'wöchentlich'], [0, 'nie']].map(o => '<option value="' + o[0] + '"' + (+SY.remind === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
-        '</select></div><div class="hint">Gesichert wird über „Sicherung speichern …“ in der Seitenleiste.</div></div>' +
+        '</select></div><div class="hint">Nach dem Speichern öffnet sich direkt das Fenster, in dem die Sicherungsdatei erstellt und in iCloud Drive abgelegt wird. Später geht das jederzeit über „Sicherung speichern …“ in der Seitenleiste.</div></div>' +
       '<div id="syNas">' + (httpsOk ? '' : '<div class="warn">Die NAS-Synchronisierung funktioniert nur in der App bzw. über die Web-Adresse (https).</div>') +
         '<div class="field"><label>WebDAV-Adresse des Ordners</label><input type="text" id="nUrl" value="' + esc(SY.nas.url) + '" placeholder="https://deinname.synology.me:8443/" autocapitalize="off" spellcheck="false"></div>' +
         '<div class="grid2"><div class="field"><label>Benutzer (NAS)</label><input type="text" id="nUser" value="' + esc(SY.nas.user) + '" autocapitalize="off" spellcheck="false"></div>' +
@@ -3319,7 +3319,11 @@
           '<li>Hier eintragen: Adresse <code>https://deinname.synology.me:8443/</code>, Benutzer <code>notenbuch</code> und das Passwort aus der config.yml – dann „Verbindung testen“.</li></ol>' +
           '<p class="hint">Auf jedem Gerät (MacBook, iPad) dieselben Angaben und dasselbe Sync-Passwort eintragen.</p></details></div>';
     openDialog('Synchronisierung', html, [{label:'Abbrechen'}, {label:'Speichern', cls:'primary', onClick:() => { commit(); return false; }}], true);
-    const show = () => { const m = dlg.querySelector('input[name=syMode]:checked').value; dq('#syIcloud').hidden = m !== 'icloud'; dq('#syNas').hidden = m !== 'nas'; };
+    const show = () => {
+      const m = dlg.querySelector('input[name=syMode]:checked').value; dq('#syIcloud').hidden = m !== 'icloud'; dq('#syNas').hidden = m !== 'nas';
+      const b = [...dlg.querySelectorAll('.dlgbtns button')].find(x => x.classList.contains('primary'));
+      if (b) b.textContent = m === 'icloud' ? 'Speichern & Sicherung erstellen …' : m === 'nas' ? 'Speichern & synchronisieren' : 'Speichern';
+    };
     dlg.querySelectorAll('input[name=syMode]').forEach(r => r.addEventListener('change', show)); show();
     const readNas = () => ({url:dq('#nUrl').value.trim(), user:dq('#nUser').value.trim(), pass:dq('#nPass').value, syncpw:dq('#nSync').value, auto:dq('#nAuto').checked});
     if (dq('#nCopy')) dq('#nCopy').onclick = () => { try { navigator.clipboard.writeText(yml); dq('#nCopy').textContent = '✓ kopiert'; } catch(e){} };
@@ -3356,6 +3360,7 @@
       await saveSecrets(); saveSY();
       dlg.close(); renderSyncStatus(); renderBuch();
       if (mode === 'nas') doSync(true);
+      if (mode === 'icloud') setTimeout(openSicherung, 0);   // gleich die erste Sicherung erstellen
     }
   }
 
