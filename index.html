@@ -130,6 +130,14 @@
   table.gb input.pt:focus{color:var(--ink);font-size:13px}
   table.gb input.nm{font-size:16px;font-weight:700;width:52px;padding:3px 4px;border-radius:8px}
   table.gb input.nm.nmok{border-color:transparent}
+  /* Arbeiten/Tests: ganzes Feld in der Notenfarbe */
+  table.gb td.pc.gfill{background-image:none!important;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)}
+  table.gb td.pc .gbig{display:inline-block;font-size:19px;font-weight:800;line-height:24px;font-variant-numeric:tabular-nums}
+  table.gb td.pc.gfill input.pt,table.gb td.pc.gfill input.nm{background:transparent!important;color:inherit!important;border-color:transparent}
+  table.gb td.pc.gfill input.pt{opacity:.9;font-weight:600}
+  table.gb td.pc.gfill input:hover{border-color:rgba(255,255,255,.7)}
+  table.gb td.pc.gfill input:focus{background:#fff!important;color:var(--ink)!important;border-color:var(--accent);opacity:1}
+  @media print{table.gb td.pc.gfill{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   table.gb .g.sm{height:22px;line-height:0;margin-top:1px}
   table.gb .g.sm svg{vertical-align:top}
   .smiley{display:inline-block;vertical-align:middle}
@@ -1221,12 +1229,15 @@
         const sp = $('g-' + l.id + '-' + s.id); if (!sp) return;
         const x = cellVal(k, l, s.id);
         const inp = sp.nextElementSibling;
+        // Ganzes Feld in der Notenfarbe: Note groß oben, Punkte klein darunter
+        const cc = x.state === 'ok' ? gradeColors(k.stufe, x.v) : null, td = sp.parentElement;
+        td.classList.toggle('gfill', !!cc);
+        td.style.backgroundColor = cc ? cc.bg : ''; td.style.color = cc ? cc.fg : '';
         if (l.typ === 'note'){
           sp.innerHTML = ''; sp.style.display = 'none';
-          const cc = x.state === 'ok' ? gradeColors(k.stufe, x.v) : null;
-          inp.style.background = cc ? cc.bg : ''; inp.style.color = cc ? cc.fg : '';
+          inp.style.background = ''; inp.style.color = '';
           inp.classList.toggle('nmok', !!cc);
-        } else { sp.style.display = ''; sp.innerHTML = x.state === 'ok' ? gradePill(k.stufe, x.v, x.label) : ''; }
+        } else { sp.style.display = ''; sp.innerHTML = x.state === 'ok' ? '<span class="gbig">' + esc(x.label) + '</span>' : ''; }
         inp.classList.toggle('bad', x.state === 'bad');
         inp.classList.toggle('skip', x.state === 'skip');
         if (!inp.classList.contains('ro')) inp.title = x.state === 'bad' ? (l.typ === 'note' ? 'Ungültige Note' : 'Ungültig: Punkte zwischen 0 und ' + num(getR(l, k.stufe).total)) : '';
