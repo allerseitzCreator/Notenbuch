@@ -138,6 +138,12 @@
   #smPicker button:hover,#smPicker button.on{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
   #smPicker .clr{font-size:16px;width:30px;height:44px;justify-content:center}
   @media print{#smPicker{display:none!important}}
+  table.gb tr.shid{display:none}
+  table.gb td.nr[data-solo]{cursor:pointer}
+  table.gb td.nr[data-solo]:hover{color:var(--accent);background:#f4f7fe;text-decoration:underline}
+  table.gb.solo td.nr[data-solo]{background:var(--accent);color:#fff;font-weight:700}
+  .solobar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#eef2fb;border:1px solid #c9d3ea;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:14px}
+  .solobar .sp{flex:1}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
   .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
   .emptystate h2{color:var(--ink)}
@@ -1010,6 +1016,7 @@
   /* ============================================================
      Notenbuch – Darstellung
      ============================================================ */
+  let solo = null;   // Einzelansicht {kid, sid}, nur für diese Sitzung
   function renderBuch(){
     $('klassenListe').innerHTML = DB.klassen.length
       ? DB.klassen.map(k => '<li data-kid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span class="kn">' + esc(k.name) + '</span>' + badge(k.stufe) +
@@ -1050,9 +1057,18 @@
         '<button class="btn" type="button" data-act="entryCancel">' + (entry && entry.neu ? 'Verwerfen' : 'Termin löschen') + '</button><button class="btn primary" type="button" data-act="entryDone">Fertig</button></div>';
     }
     const ecls = l => eL === l ? ' entrycol' : '';
+    // Einzelansicht: nur die Zeile einer Person
+    if (solo && (solo.kid !== k.id || !k.schueler.some(s => s.id === solo.sid))) solo = null;
+    const soloS = solo ? solo.sid : null;
+    if (soloS){
+      const si = k.schueler.findIndex(s => s.id === soloS);
+      h += '<div class="solobar noprint"><span>Einzelansicht: <b>' + esc(k.schueler[si].name) + '</b> (' + (si + 1) + ' von ' + k.schueler.length + ')</span><span class="sp"></span>' +
+        '<button class="btn" type="button" data-act="soloPrev" title="Vorherige Person">‹ Vorherige</button><button class="btn" type="button" data-act="soloNext" title="Nächste Person">Nächste ›</button>' +
+        '<button class="btn primary" type="button" data-act="soloOff">Alle anzeigen</button></div>';
+    }
 
     // Kopfzeile 1: Kategorien
-    h += '<div class="tablewrap"><table class="gb"><thead><tr><th rowspan="3" class="nr">Nr.</th><th rowspan="3" class="name">Name<span class="nmove noprint" title="Namensspalte verschieben: ziehen = stufenlos, tippen = neben die Endnoten bzw. zurück nach links">⇆</span></th>';
+    h += '<div class="tablewrap"><table class="gb' + (soloS ? ' solo' : '') + '"><thead><tr><th rowspan="3" class="nr">Nr.</th><th rowspan="3" class="name">Name<span class="nmove noprint" title="Namensspalte verschieben: ziehen = stufenlos, tippen = neben die Endnoten bzw. zurück nach links">⇆</span></th>';
     const KC = {};
     k.kats.forEach(c => { const f = katFarbe(k.kats, c); if (f !== 'keine') KC[c.id] = f; });
     // Alle Zellen einer Kategorie bekommen data-kc → Tönung über CSS-Variablen
@@ -1096,7 +1112,7 @@
     });
     h += '</tr></thead><tbody>';
     k.schueler.forEach((s, r) => {
-      h += '<tr><td class="nr">' + (r + 1) + '</td><td class="name" data-sid="' + s.id + '" title="' + (s.notiz ? esc('Notizen: ' + s.notiz.slice(0, 300)) : 'Notizen, umbenennen, löschen') + '">' + esc(s.name) + (s.notiz ? ' <span class="nicon">📝</span>' : '') + '</td>';
+      h += '<tr' + (soloS && s.id !== soloS ? ' class="shid"' : '') + '><td class="nr" data-solo="' + s.id + '" title="' + (soloS ? 'Wieder alle anzeigen' : 'Nur ' + esc(s.name) + ' anzeigen') + '">' + (r + 1) + '</td><td class="name" data-sid="' + s.id + '" title="' + (s.notiz ? esc('Notizen: ' + s.notiz.slice(0, 300)) : 'Notizen, umbenennen, löschen') + '">' + esc(s.name) + (s.notiz ? ' <span class="nicon">📝</span>' : '') + '</td>';
       k.kats.forEach(c => { const h0 = h.length;
         if (isNoteKat(c)){
           if (!G[c.id].length) h += '<td class="catstart"></td>';
@@ -2601,6 +2617,15 @@
   const main = $('buchMain');
   main.addEventListener('click', e => {
     const k = aktKlasse();
+    const so = e.target.closest('td.nr[data-solo]');
+    if (so && k){ solo = solo ? null : {kid:k.id, sid:so.dataset.solo}; renderBuch(); return; }
+    const sa = e.target.closest('[data-act^=solo]');
+    if (sa && k && solo){
+      if (sa.dataset.act === 'soloOff') solo = null;
+      else { const n = k.schueler.length, i = k.schueler.findIndex(s => s.id === solo.sid);
+        solo.sid = k.schueler[(i + (sa.dataset.act === 'soloNext' ? 1 : n - 1)) % n].id; }
+      renderBuch(); return;
+    }
     const ep = e.target.closest('[data-epick]');
     if (ep && k){
       const l = entryL(); if (!l) return;
