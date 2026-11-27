@@ -104,9 +104,14 @@
   table.gb th.lh{cursor:pointer;min-width:74px}
   table.gb th.lh:hover{background:var(--accent-soft);color:var(--accent)}
   table.gb .nr{color:var(--muted);font-size:12px;width:34px}
-  table.gb .name{text-align:left;position:sticky;left:0;z-index:2;min-width:170px;font-weight:500}
+  table.gb .name{text-align:left;position:sticky;left:var(--nx,0px);z-index:2;min-width:170px;font-weight:500}
   table.gb thead .name{z-index:3}
   table.gb td.name{cursor:pointer}
+  table.gb th.name .nmove{float:right;margin:-3px -2px -3px 8px;padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--muted);cursor:ew-resize;touch-action:none;user-select:none;-webkit-user-select:none;font-size:13px;line-height:1}
+  table.gb th.name .nmove:hover,table.gb.nmoving th.name .nmove{color:var(--accent);border-color:var(--accent)}
+  table.gb.nfloat .name{box-shadow:-7px 0 8px -6px rgba(20,30,60,.28),7px 0 8px -6px rgba(20,30,60,.28)}
+  table.gb.nmoving .name{background-color:#f4f7fe}
+  table.gb.nfloat tr{background:#f3f5f8}
   table.gb td.name:hover{color:var(--accent)}
   table.gb .avgcol{background:#f8f9fb}
   table.gb td.tot{font-weight:700}
@@ -1047,7 +1052,7 @@
     const ecls = l => eL === l ? ' entrycol' : '';
 
     // Kopfzeile 1: Kategorien
-    h += '<div class="tablewrap"><table class="gb"><thead><tr><th rowspan="3" class="nr">Nr.</th><th rowspan="3" class="name">Name</th>';
+    h += '<div class="tablewrap"><table class="gb"><thead><tr><th rowspan="3" class="nr">Nr.</th><th rowspan="3" class="name">Name<span class="nmove noprint" title="Namensspalte verschieben: ziehen = stufenlos, tippen = neben die Endnoten bzw. zurück nach links">⇆</span></th>';
     const KC = {};
     k.kats.forEach(c => { const f = katFarbe(k.kats, c); if (f !== 'keine') KC[c.id] = f; });
     // Alle Zellen einer Kategorie bekommen data-kc → Tönung über CSS-Variablen
@@ -1136,7 +1141,56 @@
       'Ein Feld einer bestehenden Datumsspalte anklicken, um dort Noten zu ändern. Neue Nummer über „+“ neben „Mündlich“. Namen anklicken zum Umbenennen oder Löschen.</p>';
     main.innerHTML = h;
     refreshDerived();
+    initNameMove();
   }
+
+  /* ---------- Namensspalte stufenlos verschieben (Einstellung nur auf diesem Gerät) ---------- */
+  let NX = 0;
+  try { NX = Math.max(0, +localStorage.getItem('notenbuch-namepos') || 0); } catch (e) {}
+  function initNameMove(){
+    const tbl = document.querySelector('table.gb'), wrap = tbl && tbl.parentElement, th = tbl && tbl.querySelector('th.name'), hd = th && th.querySelector('.nmove');
+    if (!hd) return;
+    const maxX = () => Math.max(0, wrap.clientWidth - th.offsetWidth);
+    const nat = () => th.offsetLeft;   // natürliche Position (hinter „Nr.“)
+    const apply = (x, save) => {
+      NX = Math.round(Math.min(Math.max(0, x), maxX()));
+      tbl.style.setProperty('--nx', NX + 'px');
+      tbl.classList.toggle('nfloat', NX > nat() + 2);
+      if (save) try { localStorage.setItem('notenbuch-namepos', String(NX)); } catch (e) {}
+    };
+    apply(NX, false);
+    let st = null;
+    hd.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      // Startwert = aktuelle sichtbare Position der Spalte
+      const cur = th.getBoundingClientRect().left - wrap.getBoundingClientRect().left - wrap.clientLeft;
+      st = {x: e.clientX, nx: Math.max(0, cur), moved: false};
+      try { hd.setPointerCapture(e.pointerId); } catch (er) {}
+      tbl.classList.add('nmoving');
+    });
+    hd.addEventListener('pointermove', e => {
+      if (!st) return;
+      const dx = e.clientX - st.x;
+      if (Math.abs(dx) > 3) st.moved = true;
+      if (st.moved) apply(st.nx + dx, false);
+    });
+    const end = e => {
+      if (!st) return;
+      const moved = st.moved; st = null; tbl.classList.remove('nmoving');
+      if (moved){ apply(NX, true); return; }
+      // Tippen: zwischen „links“ und „direkt neben den Endnoten“ umschalten
+      if (NX > nat() + 2){ apply(0, true); wrap.scrollLeft = 0; return; }
+      const avg = tbl.querySelector('thead th.avgcol');
+      wrap.scrollLeft = wrap.scrollWidth;
+      const sl = wrap.scrollLeft;
+      apply(avg.offsetLeft - sl - th.offsetWidth, true);
+    };
+    hd.addEventListener('pointerup', end);
+    hd.addEventListener('pointercancel', end);
+    hd.addEventListener('click', e => e.stopPropagation());
+  }
+  window.addEventListener('resize', () => { const t = document.querySelector('table.gb'); if (t && NX) initNameMoveClamp(t); });
+  function initNameMoveClamp(t){ const th = t.querySelector('th.name'), w = t.parentElement; const x = Math.min(NX, Math.max(0, w.clientWidth - th.offsetWidth)); t.style.setProperty('--nx', x + 'px'); }
 
   function refreshDerived(){
     const k = aktKlasse(); if (!k) return;
