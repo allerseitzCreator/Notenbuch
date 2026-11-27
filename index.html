@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Notenbuch">
+<meta name="theme-color" content="#2f5bd3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Notenbuch - created by Markus Seitz</title>
 <style>
   :root{
@@ -253,6 +260,14 @@
   .aw-tab td.zero{color:#c4c9d2}
   .aw-tab td.has{font-weight:700;background:var(--accent-soft)}
   .aw-tab td.na-c{background:repeating-linear-gradient(45deg,#f4f5f7 0 4px,#fff 4px 8px)}
+  .side li .kn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .side li .liact{display:none;gap:2px;margin-left:2px}
+  .side li.active .liact,.side li:hover .liact{display:inline-flex}
+  .side li.active .badge,.side li:hover .badge{display:none}
+  .side li .liact button{border:0;background:transparent;padding:3px;border-radius:6px;cursor:pointer;color:var(--muted);line-height:0}
+  .side li .liact button:hover{background:#fff;color:var(--accent)}
+  .side li .liact button.del:hover{color:var(--bad);background:var(--bad-bg)}
+  .tplload{background:var(--accent-soft);border-radius:10px;padding:10px 12px}
   dialog::backdrop{background:rgba(20,25,35,.4)}
   .dlgform{padding:20px 22px}
   .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -310,11 +325,14 @@
       <h2>Klassen &amp; Kurse</h2>
       <ul id="klassenListe"></ul>
       <button class="btn primary" id="neueKlasse" type="button">+ Klasse / Kurs</button>
+      <button class="btn" id="vorlagenBtn" type="button">Vorlagen …</button>
+      <button class="btn" id="importKlasse" type="button" title="CSV- oder Excel-Datei (Numbers: vorher als Excel/CSV exportieren)">Klasse importieren …</button>
       <h3>Datensicherung</h3>
       <button class="btn" id="exportJson" type="button">Sicherung herunterladen</button>
       <button class="btn" id="importBtn" type="button">Sicherung laden …</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
       <div class="hint">Alle Daten liegen nur in diesem Browser auf diesem Gerät. Regelmäßig sichern!</div>
+      <div class="hint" id="offlineStatus" style="margin-top:8px"></div>
     </aside>
     <section class="card" id="buchMain" style="min-width:0"></section>
   </div>
@@ -597,6 +615,7 @@
   let DB;
   try { DB = JSON.parse(localStorage.getItem('notenbuch-v1')); } catch(e) { DB = null; }
   if (!DB || !Array.isArray(DB.klassen)) DB = {klassen:[], aktiv:null, view:'buch'};
+  if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
   const saveDB = () => { try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
   const aktKlasse = () => DB.klassen.find(k => k.id === DB.aktiv) || null;
 
@@ -774,7 +793,8 @@
      ============================================================ */
   function renderBuch(){
     $('klassenListe').innerHTML = DB.klassen.length
-      ? DB.klassen.map(k => '<li data-kid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span>' + esc(k.name) + '</span>' + badge(k.stufe) + '</li>').join('')
+      ? DB.klassen.map(k => '<li data-kid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span class="kn">' + esc(k.name) + '</span>' + badge(k.stufe) +
+          '<span class="liact"><button type="button" data-kset="' + k.id + '" title="Einstellungen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button><button type="button" class="del" data-kdel2="' + k.id + '" title="Klasse löschen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg></button></span></li>').join('')
       : '<li class="empty">Noch keine Klassen angelegt.</li>';
 
     if (entry && entry.kid !== DB.aktiv) finishEntry(true);
@@ -965,12 +985,21 @@
   }
   const dq = sel => dlg.querySelector(sel);
 
-  function openKlasse(k){
+  // tpl: undefined = Klasse; {} = neue Vorlage; Vorlagen-Objekt = Vorlage bearbeiten
+  function openKlasse(k, tpl){
+    const isTpl = !!tpl;
     const isNew = !k;
-    const d = k ? {name:k.name, stufe:k.stufe, kats:copy(k.kats)} : {name:'', stufe:'mittel', kats:defKats('mittel')};
+    const d = isTpl ? {name:tpl.name || '', stufe:tpl.stufe || 'mittel', kats:(tpl.kats || defKats('mittel')).map(c => Object.assign({}, c, {id:uid()}))}
+      : k ? {name:k.name, stufe:k.stufe, kats:copy(k.kats)} : {name:'', stufe:'mittel', kats:defKats('mittel')};
     const locked = !!(k && k.leistungen.length);
+    const used = new Set(k ? k.leistungen.map(l => l.kat) : []);
     const html =
-      '<div class="field"><label>Name</label><input type="text" id="kName" value="' + esc(d.name) + '" placeholder="z. B. 7a Mathematik oder M1 (Kursstufe)"></div>' +
+      (!isTpl ? '<div class="field tplload"><label for="kTpl">Vorlage laden</label>' +
+        (DB.vorlagen.length
+          ? '<select id="kTpl"><option value="">– Vorlage wählen –</option>' + DB.vorlagen.map(v => '<option value="' + v.id + '">' + esc(v.name) + ' (' + stufeName(v.stufe) + ')</option>').join('') + '</select>' +
+            '<div class="hint">Übernimmt Stufe, Kategorien und Gewichtung. Die Vorlage selbst bleibt unverändert.</div>'
+          : '<div class="hint" style="margin:0">Noch keine Vorlagen – Einstellungen unten vornehmen und mit „Als Vorlage speichern …“ sichern.</div>') + '</div>' : '') +
+      '<div class="field"><label>' + (isTpl ? 'Name der Vorlage' : 'Name') + '</label><input type="text" id="kName" value="' + esc(d.name) + '" placeholder="' + (isTpl ? 'z. B. Englisch Unterstufe' : 'z. B. 7a Mathematik oder M1 (Kursstufe)') + '"></div>' +
       '<div class="field"><span class="lbl">Stufe</span><div class="seg">' +
       '<label><input type="radio" name="kStufe" value="mittel" ' + (d.stufe === 'mittel' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Mittelstufe (1–6)</label>' +
       '<label><input type="radio" name="kStufe" value="kurs" ' + (d.stufe === 'kurs' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Kursstufe (0–15 VP)</label></div>' +
@@ -1013,10 +1042,39 @@
       vals.forEach((v, i) => d.kats[i].w = v);
       renderKats(true);
     };
+    const readAll = () => { readKats(); const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value; d.name = dq('#kName').value.trim(); };
     const buttons = [];
-    if (!isNew) buttons.push({label:'Klasse löschen', cls:'danger', onClick:() => {
-      if (!confirm('„' + k.name + '“ mit allen Schüler·innen und Noten endgültig löschen?')) return false;
-      DB.klassen = DB.klassen.filter(x => x !== k); DB.aktiv = DB.klassen[0] ? DB.klassen[0].id : null; saveDB(); renderBuch();
+    if (isTpl){
+      if (tpl.id) buttons.push({label:'Vorlage löschen', cls:'danger', onClick:() => {
+        if (!confirm('Vorlage „' + tpl.name + '“ löschen? Bestehende Klassen bleiben unverändert.')) return false;
+        DB.vorlagen = DB.vorlagen.filter(x => x.id !== tpl.id); saveDB(); setTimeout(openVorlagen, 0);
+      }});
+      buttons.push({label:'Abbrechen', onClick:() => { setTimeout(openVorlagen, 0); }});
+      buttons.push({label:'Vorlage speichern', cls:'primary', onClick:() => {
+        readAll();
+        if (!d.name){ dq('#kName').classList.add('invalid'); dq('#kName').focus(); return false; }
+        const kats = d.kats.filter(c => c.name);
+        if (!kats.length || !kats.some(c => +c.w > 0)){ alert('Mindestens eine Kategorie mit Gewicht größer als 0 ist nötig.'); return false; }
+        const same = DB.vorlagen.find(x => x.name.toLowerCase() === d.name.toLowerCase() && x.id !== tpl.id);
+        if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Überschreiben?')) return false;
+        if (same) DB.vorlagen = DB.vorlagen.filter(x => x !== same);
+        saveAsTemplate(d.name, d.stufe, kats, tpl.id); setTimeout(openVorlagen, 0);
+      }});
+    } else {
+    if (!isNew) buttons.push({label:'Klasse löschen', cls:'danger', onClick:() => { if (!deleteKlasse(k)) return false; }});
+    buttons.push({label:'Als Vorlage speichern …', onClick:() => {
+      readAll();
+      const kats = d.kats.filter(c => c.name);
+      if (!kats.length || !kats.some(c => +c.w > 0)){ alert('Mindestens eine Kategorie mit Gewicht größer als 0 ist nötig.'); return false; }
+      const name = (prompt('Name der Vorlage (z. B. „Englisch Unterstufe“):', '') || '').trim(); if (!name) return false;
+      const same = DB.vorlagen.find(x => x.name.toLowerCase() === name.toLowerCase());
+      if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Mit diesen Einstellungen überschreiben?')) return false;
+      saveAsTemplate(name, d.stufe, kats, same ? same.id : null);
+      const sel = dq('#kTpl');
+      const box = dlg.querySelector('.tplload');
+      if (box) box.innerHTML = '<label for="kTpl">Vorlage laden</label><select id="kTpl"><option value="">– Vorlage wählen –</option>' + DB.vorlagen.map(v => '<option value="' + v.id + '">' + esc(v.name) + ' (' + stufeName(v.stufe) + ')</option>').join('') + '</select><div class="hint" style="color:#2e9e4f">✓ Vorlage „' + esc(name) + '“ gespeichert.</div>';
+      bindTpl();
+      return false;
     }});
     buttons.push({label:'Abbrechen'});
     buttons.push({label: isNew ? 'Anlegen' : 'Speichern', cls:'primary', onClick:() => {
@@ -1037,8 +1095,29 @@
       }
       saveDB(); renderBuch();
     }});
-    openDialog(isNew ? 'Neue Klasse / neuer Kurs' : 'Einstellungen: ' + k.name, html, buttons);
+    }
+    openDialog(isTpl ? (tpl.id ? 'Vorlage bearbeiten' : 'Neue Vorlage') : isNew ? 'Neue Klasse / neuer Kurs' : 'Einstellungen: ' + k.name, html, buttons, isTpl ? false : false);
     renderKats();
+    // Vorlage in die Klasse laden (Kategorien mit gleichem Namen behalten ihre Einträge)
+    function bindTpl(){
+      const sel = dq('#kTpl'); if (!sel) return;
+      sel.addEventListener('change', () => {
+        const v = DB.vorlagen.find(x => x.id === sel.value); if (!v) return;
+        readKats();
+        const old = d.kats;
+        const nk = v.kats.map(c => { const m = old.find(o => o.name.toLowerCase() === c.name.toLowerCase());
+          return {id: m ? m.id : uid(), name:c.name, w:c.w, typ: m && used.has(m.id) ? katTyp(m) : c.typ}; });
+        const kept = old.filter(o => used.has(o.id) && !nk.some(x => x.id === o.id));
+        kept.forEach(o => nk.push(Object.assign({}, o)));
+        d.kats = nk;
+        if (!locked){ d.stufe = v.stufe; dlg.querySelectorAll('input[name=kStufe]').forEach(r => r.checked = r.value === v.stufe); }
+        renderKats();
+        const hint = sel.parentNode.querySelector('.hint');
+        if (hint) hint.innerHTML = '✓ Vorlage „' + esc(v.name) + '“ geladen' + (kept.length ? ' – beibehalten, weil schon Noten darin stehen: ' + kept.map(o => esc(o.name)).join(', ') : '') + '. Die Vorlage selbst bleibt unverändert.';
+        dq('#kName').focus();
+      });
+    }
+    bindTpl();
     dq('#kRatio').addEventListener('input', applyRatio);
     dq('#katList').addEventListener('input', e => { if (e.target.classList.contains('kw')) updPct(); });
     dq('#katAdd').onclick = () => { readKats(); d.kats.push({id:uid(), name:'', w:1, typ:'note'}); renderKats(); dlg.querySelector('.katrow:last-child .kn').focus(); };
@@ -1228,11 +1307,259 @@
     });
   }
 
+  /* ============================================================
+     Klassen importieren (CSV, Excel .xlsx; Numbers über Export)
+     ============================================================ */
+  // --- ZIP lesen (für .xlsx), ohne Bibliothek ---
+  async function unzip(buf){
+    const dv = new DataView(buf), u8 = new Uint8Array(buf);
+    let eocd = -1;
+    for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+    if (eocd < 0) throw new Error('kein ZIP');
+    const count = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true);
+    const files = {}, td = new TextDecoder();
+    for (let n = 0; n < count; n++){
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+      const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), loff = dv.getUint32(p + 42, true);
+      files[td.decode(u8.subarray(p + 46, p + 46 + nlen))] = {method, csize, loff};
+      p += 46 + nlen + xlen + clen;
+    }
+    const read = async name => {
+      const f = files[name]; if (!f) return null;
+      const start = f.loff + 30 + dv.getUint16(f.loff + 26, true) + dv.getUint16(f.loff + 28, true);
+      const data = u8.subarray(start, start + f.csize);
+      if (f.method === 0) return td.decode(data);
+      if (typeof DecompressionStream === 'undefined') throw new Error('Dieser Browser kann Excel-Dateien nicht entpacken – bitte als CSV speichern.');
+      const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+      return td.decode(out);
+    };
+    return {names:Object.keys(files), read};
+  }
+  const xmlDoc = t => new DOMParser().parseFromString(t, 'application/xml');
+  const colIdx = ref => { const m = /^([A-Z]+)/.exec(ref || ''); if (!m) return -1; let n = 0; for (const ch of m[1]) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+  async function parseXlsx(buf){
+    const z = await unzip(buf);
+    const wb = xmlDoc(await z.read('xl/workbook.xml') || '');
+    const rels = xmlDoc(await z.read('xl/_rels/workbook.xml.rels') || '<r/>');
+    const relMap = {};
+    [...rels.getElementsByTagName('Relationship')].forEach(r => relMap[r.getAttribute('Id')] = r.getAttribute('Target'));
+    const ssXml = await z.read('xl/sharedStrings.xml');
+    const shared = ssXml ? [...xmlDoc(ssXml).getElementsByTagName('si')].map(si => [...si.getElementsByTagName('t')].map(t => t.textContent).join('')) : [];
+    const sheets = [];
+    for (const sh of [...wb.getElementsByTagName('sheet')]){
+      const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+      let target = relMap[rid] || ''; if (!target) continue;
+      target = target.replace(/^\//, ''); if (!target.startsWith('xl/')) target = 'xl/' + target;
+      const xml = await z.read(target); if (!xml) continue;
+      const rows = [];
+      [...xmlDoc(xml).getElementsByTagName('row')].forEach(row => {
+        const r = [];
+        [...row.getElementsByTagName('c')].forEach((c, i) => {
+          const t = c.getAttribute('t'), idx = c.getAttribute('r') ? colIdx(c.getAttribute('r')) : i;
+          const v = c.getElementsByTagName('v')[0];
+          let val = '';
+          if (t === 's') val = v ? (shared[+v.textContent] ?? '') : '';
+          else if (t === 'inlineStr') val = [...c.getElementsByTagName('t')].map(x => x.textContent).join('');
+          else val = v ? v.textContent : '';
+          r[idx] = String(val).trim();
+        });
+        rows.push(Array.from(r, x => x ?? ''));
+      });
+      sheets.push({name:sh.getAttribute('name') || 'Tabelle', rows});
+    }
+    return sheets;
+  }
+  function decodeText(buf){
+    try { return new TextDecoder('utf-8', {fatal:true}).decode(buf).replace(/^﻿/, ''); }
+    catch(e){ return new TextDecoder('windows-1252').decode(buf); }
+  }
+  function parseCsv(text){
+    const first = text.split(/\r?\n/).find(l => l.trim()) || '';
+    const delim = [';', '\t', ','].map(d => [d, first.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < text.length; i++){
+      const ch = text[i];
+      if (q){ if (ch === '"'){ if (text[i + 1] === '"'){ cur += '"'; i++; } else q = false; } else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === delim){ row.push(cur.trim()); cur = ''; }
+      else if (ch === '\n' || ch === '\r'){ if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur.trim()); rows.push(row); row = []; cur = ''; }
+      else cur += ch;
+    }
+    if (cur !== '' || row.length){ row.push(cur.trim()); rows.push(row); }
+    return [{name:'CSV', rows}];
+  }
+
+  async function startImport(target){
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.csv,.txt,.tsv,.xlsx,.xls,.numbers,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      if (ext === 'numbers') return openDialog('Numbers-Datei', '<p>Numbers-Dateien können im Browser leider nicht direkt gelesen werden. So geht es in wenigen Sekunden:</p>' +
+        '<ol><li>Datei in <b>Numbers</b> öffnen</li><li><b>Ablage › Exportieren › Excel …</b> (oder <b>CSV …</b>) wählen</li><li>Die exportierte Datei hier importieren</li></ol>' +
+        '<div class="hint">Auf dem iPad: in Numbers auf <b>⋯ › Exportieren › Excel</b> tippen und „In Dateien sichern“ wählen.</div>', [{label:'OK', cls:'primary'}]);
+      if (ext === 'xls') return openDialog('Ältere Excel-Datei (.xls)', '<p>Das alte Excel-Format .xls kann nicht gelesen werden. Bitte die Datei in Excel oder Numbers öffnen und als <b>.xlsx</b> oder <b>CSV</b> speichern bzw. exportieren.</p>', [{label:'OK', cls:'primary'}]);
+      try {
+        const buf = await f.arrayBuffer();
+        const isZip = new Uint8Array(buf, 0, 2)[0] === 0x50 && new Uint8Array(buf, 0, 2)[1] === 0x4b;
+        const sheets = isZip ? await parseXlsx(buf) : parseCsv(decodeText(buf));
+        const usable = sheets.filter(s => s.rows.some(r => r.some(c => c)));
+        if (!usable.length) throw new Error('Die Datei enthält keine Daten.');
+        openImport(f.name, usable, target);
+      } catch(err){ alert('Die Datei konnte nicht gelesen werden.\n' + (err && err.message ? err.message : '')); }
+    };
+    inp.click();
+  }
+
+  function openImport(fname, sheets, target){
+    let si = 0;
+    const st = {header:true, nach:0, vor:-1, klasse:-1, format:'nv', ziel: target ? 'vorhanden' : 'neu', kid: target ? target.id : '', neuName:'', stufe:'mittel', sort:true};
+    const guess = () => {
+      const rows = sheets[si].rows, h = (rows[0] || []).map(x => String(x).toLowerCase());
+      const find = re => h.findIndex(x => re.test(x));
+      const hasHead = h.some(x => /name|klasse|kurs|vorname|schüler|schueler/.test(x));
+      st.header = hasHead;
+      st.nach = Math.max(0, find(/nachname|familienname|^name$|schüler|schueler|^name/));
+      st.vor = find(/vorname|rufname/);
+      if (st.vor === st.nach) st.vor = -1;
+      st.klasse = find(/^klasse|klasse$|^kurs|lerngruppe/);
+      if (!hasHead){ // ohne Überschrift: 1. Spalte Nachname, 2. Spalte Vorname, falls vorhanden
+        st.nach = 0; st.vor = (rows[0] || []).length > 1 ? 1 : -1; st.klasse = -1;
+      }
+    };
+    guess();
+    const ncols = () => Math.max(1, ...sheets[si].rows.slice(0, 50).map(r => r.length));
+    const colName = i => { const h = sheets[si].rows[0] || []; const L = i < 26 ? String.fromCharCode(65 + i) : 'Spalte ' + (i + 1); return st.header && h[i] ? L + ': ' + h[i] : 'Spalte ' + L; };
+    const colSel = (id, val, none) => '<select id="' + id + '">' + (none ? '<option value="-1">– keine –</option>' : '') +
+      Array.from({length:ncols()}, (_, i) => '<option value="' + i + '"' + (val === i ? ' selected' : '') + '>' + esc(colName(i)) + '</option>').join('') + '</select>';
+    const result = () => {
+      const rows = sheets[si].rows.slice(st.header ? 1 : 0);
+      const out = [];
+      rows.forEach(r => {
+        const n = String(r[st.nach] ?? '').trim(), v = st.vor >= 0 ? String(r[st.vor] ?? '').trim() : '';
+        if (!n && !v) return;
+        let name = v ? (st.format === 'nv' ? n + ', ' + v : v + ' ' + n) : n;
+        name = name.replace(/\s+/g, ' ').trim();
+        const kl = st.klasse >= 0 ? String(r[st.klasse] ?? '').trim() : '';
+        out.push({name, kl});
+      });
+      return out;
+    };
+    const render = () => {
+      const R = result(), groups = st.klasse >= 0 ? [...new Set(R.map(x => x.kl || '(ohne Klasse)'))] : null;
+      let h = '<div class="hint" style="margin:-6px 0 10px">Datei: <b>' + esc(fname) + '</b></div>';
+      if (sheets.length > 1) h += '<div class="field"><label>Tabellenblatt</label><select id="iSheet">' + sheets.map((s, i) => '<option value="' + i + '"' + (i === si ? ' selected' : '') + '>' + esc(s.name) + ' (' + s.rows.length + ' Zeilen)</option>').join('') + '</select></div>';
+      h += '<label class="chk" style="margin-bottom:10px"><input type="checkbox" id="iHead"' + (st.header ? ' checked' : '') + '> Erste Zeile enthält Überschriften</label>' +
+        '<div class="grid3" style="grid-template-columns:1fr 1fr 1fr"><div class="field"><label>Nachname bzw. Name</label>' + colSel('iNach', st.nach) + '</div>' +
+        '<div class="field"><label>Vorname</label>' + colSel('iVor', st.vor, true) + '</div>' +
+        '<div class="field"><label>Klasse / Kurs</label>' + colSel('iKl', st.klasse, true) + '</div></div>' +
+        (st.vor >= 0 ? '<div class="field"><span class="lbl">Schreibweise</span><div class="seg"><label><input type="radio" name="iFmt" value="nv"' + (st.format === 'nv' ? ' checked' : '') + '>Nachname, Vorname</label><label><input type="radio" name="iFmt" value="vn"' + (st.format === 'vn' ? ' checked' : '') + '>Vorname Nachname</label></div></div>' : '');
+      if (groups){
+        h += '<div class="keybox" style="margin-bottom:12px">Die Datei enthält <b>' + groups.length + '</b> Klasse(n): ' + groups.map(g => esc(g) + ' (' + R.filter(x => (x.kl || '(ohne Klasse)') === g).length + ')').join(', ') +
+          '.<br>Für jede wird eine Klasse angelegt – existiert schon eine gleichnamige, werden die Schüler·innen dort ergänzt.</div>';
+      } else {
+        h += '<div class="field"><span class="lbl">Importieren in</span><div class="seg"><label><input type="radio" name="iZiel" value="neu"' + (st.ziel === 'neu' ? ' checked' : '') + '>neue Klasse / neuen Kurs</label>' +
+          (DB.klassen.length ? '<label><input type="radio" name="iZiel" value="vorhanden"' + (st.ziel === 'vorhanden' ? ' checked' : '') + '>bestehende Klasse</label>' : '') + '</div></div>';
+        h += st.ziel === 'neu'
+          ? '<div class="field"><label>Name der neuen Klasse</label><input type="text" id="iName" value="' + esc(st.neuName || fname.replace(/\.[^.]+$/, '')) + '"></div>'
+          : '<div class="field"><label>Klasse</label><select id="iKid">' + DB.klassen.map(k => '<option value="' + k.id + '"' + (k.id === st.kid ? ' selected' : '') + '>' + esc(k.name) + ' (' + stufeName(k.stufe) + ')</option>').join('') + '</select></div>';
+      }
+      if (groups || st.ziel === 'neu') h += '<div class="field"><span class="lbl">Stufe neuer Klassen</span><div class="seg"><label><input type="radio" name="iStufe" value="mittel"' + (st.stufe === 'mittel' ? ' checked' : '') + '>Mittelstufe (1–6)</label><label><input type="radio" name="iStufe" value="kurs"' + (st.stufe === 'kurs' ? ' checked' : '') + '>Kursstufe (0–15 VP)</label></div></div>';
+      h += '<label class="chk"><input type="checkbox" id="iSort"' + (st.sort ? ' checked' : '') + '> alphabetisch sortieren</label>';
+      h += '<div class="lbl" style="margin-top:12px">Vorschau – ' + R.length + ' Schüler·innen</div><div class="tablewrap" style="max-height:30vh"><table class="key atab"><thead><tr><th class="anr">Nr.</th><th style="text-align:left">Name</th>' + (groups ? '<th style="text-align:left">Klasse</th>' : '') + '</tr></thead><tbody>' +
+        R.slice(0, 200).map((x, i) => '<tr><td class="anr">' + (i + 1) + '</td><td style="text-align:left">' + esc(x.name) + '</td>' + (groups ? '<td style="text-align:left">' + esc(x.kl) + '</td>' : '') + '</tr>').join('') +
+        (R.length > 200 ? '<tr><td></td><td style="text-align:left" class="hint">… und ' + (R.length - 200) + ' weitere</td></tr>' : '') + '</tbody></table></div>';
+      dq('.dlgbody').innerHTML = h;
+      const on = (id, ev, fn) => { const el = dq('#' + id); if (el) el.addEventListener(ev, fn); };
+      on('iSheet', 'change', e => { si = +e.target.value; guess(); render(); });
+      on('iHead', 'change', e => { st.header = e.target.checked; render(); });
+      on('iNach', 'change', e => { st.nach = +e.target.value; render(); });
+      on('iVor', 'change', e => { st.vor = +e.target.value; render(); });
+      on('iKl', 'change', e => { st.klasse = +e.target.value; render(); });
+      on('iName', 'input', e => { st.neuName = e.target.value; });
+      on('iKid', 'change', e => { st.kid = e.target.value; });
+      on('iSort', 'change', e => { st.sort = e.target.checked; });
+      dlg.querySelectorAll('input[name=iFmt]').forEach(r => r.addEventListener('change', () => { st.format = r.value; render(); }));
+      dlg.querySelectorAll('input[name=iZiel]').forEach(r => r.addEventListener('change', () => { st.ziel = r.value; if (!st.kid && DB.klassen[0]) st.kid = DB.klassen[0].id; render(); }));
+      dlg.querySelectorAll('input[name=iStufe]').forEach(r => r.addEventListener('change', () => { st.stufe = r.value; }));
+    };
+    openDialog('Klasse importieren', '', [{label:'Abbrechen'}, {label:'Importieren', cls:'primary', onClick:() => {
+      const R = result();
+      if (!R.length){ alert('Es wurden keine Namen gefunden. Bitte die Spalten prüfen.'); return false; }
+      const addTo = (k, list) => {
+        const have = new Set(k.schueler.map(s => s.name.toLowerCase()));
+        let n = 0;
+        list.forEach(x => { if (!have.has(x.name.toLowerCase())){ k.schueler.push({id:uid(), name:x.name, zeugnis:''}); have.add(x.name.toLowerCase()); n++; } });
+        if (st.sort) k.schueler.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+        return n;
+      };
+      const mk = name => { const k = {id:uid(), name, stufe:st.stufe, kats:defKats(st.stufe), schueler:[], leistungen:[]}; DB.klassen.push(k); return k; };
+      const report = [];
+      let last = null;
+      if (st.klasse >= 0){
+        const groups = [...new Set(R.map(x => x.kl || '(ohne Klasse)'))];
+        groups.forEach(g => {
+          let k = DB.klassen.find(x => x.name.toLowerCase() === g.toLowerCase()), neu = false;
+          if (!k){ k = mk(g); neu = true; }
+          const n = addTo(k, R.filter(x => (x.kl || '(ohne Klasse)') === g));
+          report.push(g + ': ' + n + ' Schüler·innen' + (neu ? ' (neu angelegt)' : ' ergänzt')); last = k;
+        });
+      } else if (st.ziel === 'neu'){
+        const name = (st.neuName || fname.replace(/\.[^.]+$/, '')).trim();
+        if (!name){ alert('Bitte einen Namen für die neue Klasse eingeben.'); return false; }
+        last = mk(name); report.push(name + ': ' + addTo(last, R) + ' Schüler·innen (neu angelegt)');
+      } else {
+        last = DB.klassen.find(x => x.id === (dq('#iKid') ? dq('#iKid').value : st.kid)); if (!last) return false;
+        const n = addTo(last, R); report.push(last.name + ': ' + n + ' Schüler·innen ergänzt' + (R.length - n ? ' (' + (R.length - n) + ' waren schon vorhanden)' : ''));
+      }
+      if (last) DB.aktiv = last.id;
+      saveDB(); setView('buch');
+      setTimeout(() => alert('Import abgeschlossen:\n' + report.join('\n')), 50);
+    }}], true);
+    render();
+  }
+
+  /* ---------- Vorlagen für Kategorien & Gewichtung ---------- */
+  const tplSummary = v => v.kats.map(c => esc(c.name) + ' ' + num(wPct(v.kats, c), 0) + ' %').join(' · ');
+  function saveAsTemplate(name, stufe, kats, replaceId){
+    const t = {id: replaceId || uid(), name, stufe, kats: kats.map(c => ({name:c.name, w:+c.w || 0, typ:katTyp(c)}))};
+    const i = DB.vorlagen.findIndex(x => x.id === t.id);
+    if (i >= 0) DB.vorlagen[i] = t; else DB.vorlagen.push(t);
+    DB.vorlagen.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    saveDB(); return t;
+  }
+  function openVorlagen(){
+    const list = DB.vorlagen.length
+      ? '<div class="tlist">' + DB.vorlagen.map(v => '<div class="trow"><span style="flex:1"><b>' + esc(v.name) + '</b> ' + badge(v.stufe) +
+          '<br><small class="hint" style="margin:0">' + tplSummary(v) + '</small></span>' +
+          '<button type="button" class="btn" data-tedit="' + v.id + '">Bearbeiten</button>' +
+          '<button type="button" class="btn" data-tcopy="' + v.id + '" title="Kopie anlegen">Kopie</button>' +
+          '<button type="button" class="btn danger" style="margin-right:0" data-tdel="' + v.id + '" title="Vorlage löschen">Löschen</button></div>').join('') + '</div>'
+      : '<p class="hint">Noch keine Vorlagen. Lege eine neue Vorlage an oder speichere die Einstellungen einer Klasse über „Als Vorlage speichern …“.</p>';
+    openDialog('Vorlagen für Kategorien & Gewichtung',
+      '<p class="hint" style="margin-top:0">Eine Vorlage enthält Stufe, Kategorien und Gewichtung – z. B. „Englisch Unterstufe“. Beim Anlegen einer Klasse lädst du die Vorlage, gibst der Klasse einen Namen und speicherst. Die Vorlage selbst bleibt unverändert erhalten.</p>' + list,
+      [{label:'+ Neue Vorlage', onClick:() => { setTimeout(() => openKlasse(null, {}), 0); }}, {label:'Schließen', cls:'primary'}], true);
+    dlg.querySelector('.dlgbody').addEventListener('click', e => {
+      const ed = e.target.closest('[data-tedit]'), cp = e.target.closest('[data-tcopy]'), del = e.target.closest('[data-tdel]');
+      if (ed){ const v = DB.vorlagen.find(x => x.id === ed.dataset.tedit); dlg.close(); openKlasse(null, v); }
+      else if (cp){ const v = DB.vorlagen.find(x => x.id === cp.dataset.tcopy); saveAsTemplate(v.name + ' (Kopie)', v.stufe, v.kats); dlg.close(); openVorlagen(); }
+      else if (del){ const v = DB.vorlagen.find(x => x.id === del.dataset.tdel); if (confirm('Vorlage „' + v.name + '“ löschen? Bestehende Klassen bleiben unverändert.')){ DB.vorlagen = DB.vorlagen.filter(x => x !== v); saveDB(); dlg.close(); openVorlagen(); } }
+    });
+  }
+  function deleteKlasse(k){
+    const n = k.leistungen.length;
+    if (!confirm('Klasse „' + k.name + '“ endgültig löschen?\n\n' + k.schueler.length + ' Schüler·innen und ' + n + ' Einträge mit allen Noten gehen verloren.' + (n ? '\n\nTipp: Vorher eine Sicherung herunterladen.' : ''))) return false;
+    DB.klassen = DB.klassen.filter(x => x !== k);
+    if (DB.aktiv === k.id) DB.aktiv = DB.klassen[0] ? DB.klassen[0].id : null;
+    saveDB(); renderBuch(); return true;
+  }
+
   function openAddSchueler(k){
     openDialog('Schüler·innen hinzufügen – ' + k.name,
       '<div class="field"><label>Namen (einer pro Zeile)</label><textarea id="sList" rows="10" placeholder="Müller, Anna&#10;Schmidt, Ben&#10;…"></textarea>' +
       '<div class="hint">Eine Namensliste kann direkt aus einer Tabelle oder Liste eingefügt werden.</div></div>',
-      [{label:'Abbrechen'}, {label:'Hinzufügen', cls:'primary', onClick:() => {
+      [{label:'Aus Datei importieren …', onClick:() => { setTimeout(() => startImport(k), 0); }}, {label:'Abbrechen'}, {label:'Hinzufügen', cls:'primary', onClick:() => {
         const names = dq('#sList').value.split(/\r?\n/).map(x => x.replace(/\t/g, ' ').trim()).filter(Boolean);
         names.forEach(n => k.schueler.push({id:uid(), name:n, zeugnis:''}));
         saveDB(); renderBuch();
@@ -1937,10 +2264,28 @@
 
   /* ---------- Ereignisse Notenbuch ---------- */
   $('klassenListe').addEventListener('click', e => {
+    const ks = e.target.closest('[data-kset]'), kd = e.target.closest('[data-kdel2]');
+    if (ks){ const k = DB.klassen.find(x => x.id === ks.dataset.kset); DB.aktiv = k.id; saveDB(); renderBuch(); return openKlasse(k); }
+    if (kd){ const k = DB.klassen.find(x => x.id === kd.dataset.kdel2); return deleteKlasse(k); }
     const li = e.target.closest('li[data-kid]'); if (!li) return;
     DB.aktiv = li.dataset.kid; saveDB(); renderBuch();
   });
   $('neueKlasse').onclick = () => openKlasse(null);
+  $('importKlasse').onclick = () => startImport(null);
+  $('vorlagenBtn').onclick = () => openVorlagen();
+
+  /* ---------- Offline-Funktion (nur über die Web-Adresse, nicht als lokale Datei) ---------- */
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
+  const offEl = $('offlineStatus');
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+      if (offEl) offEl.innerHTML = '<span style="color:#2e9e4f">●</span> Offline verfügbar';
+    }).catch(() => { if (offEl) offEl.textContent = ''; });
+  }
+  const netState = () => { if (offEl && !navigator.onLine) offEl.innerHTML = '<span style="color:var(--warn)">●</span> Offline – Änderungen werden lokal gespeichert'; };
+  window.addEventListener('offline', netState);
+  window.addEventListener('online', () => { if (offEl && navigator.serviceWorker && navigator.serviceWorker.controller) offEl.innerHTML = '<span style="color:#2e9e4f">●</span> Offline verfügbar'; });
+  netState();
   const main = $('buchMain');
   main.addEventListener('click', e => {
     const k = aktKlasse();

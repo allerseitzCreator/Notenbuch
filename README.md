@@ -4,7 +4,12 @@ Digitales Notenbuch mit integriertem Notenschlüssel-Rechner – eine einzelne H
 
 ## Starten
 
-`index.html` herunterladen und im Browser öffnen (Chrome, Edge, Firefox oder Safari).
+**Als App auf dem Mac / iPad (empfohlen):**
+1. https://allerseitzcreator.github.io/Notenbuch/ in Safari öffnen
+2. Mac: *Ablage → Zum Dock hinzufügen* · iPad: *Teilen → Zum Home-Bildschirm*
+3. Das Notenbuch erscheint als eigene App (Programme-Ordner bzw. Home-Bildschirm) und funktioniert nach dem ersten Öffnen auch **ohne Internet**. Ist eine Verbindung da, wird automatisch die neueste Version geladen.
+
+**Alternativ:** `index.html` herunterladen und im Browser öffnen (ohne Offline-Funktion und ohne App-Symbol).
 
 ## Funktionen
 
