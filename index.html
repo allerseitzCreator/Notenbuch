@@ -325,6 +325,9 @@
     #sitzMain .cam{display:none}
     #sitzMain.sitzfull{position:static}
   }
+  .nicon{font-size:11px;opacity:.8}
+  .minifoto{width:56px;height:56px;border-radius:50%;object-fit:cover;flex:none}
+  textarea#sNotiz{resize:vertical;line-height:1.45}
   dialog::backdrop{background:rgba(20,25,35,.4)}
   .dlgform{padding:20px 22px}
   .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -1056,7 +1059,7 @@
     });
     h += '</tr></thead><tbody>';
     k.schueler.forEach((s, r) => {
-      h += '<tr><td class="nr">' + (r + 1) + '</td><td class="name" data-sid="' + s.id + '" title="Umbenennen / löschen">' + esc(s.name) + '</td>';
+      h += '<tr><td class="nr">' + (r + 1) + '</td><td class="name" data-sid="' + s.id + '" title="' + (s.notiz ? esc('Notizen: ' + s.notiz.slice(0, 300)) : 'Notizen, umbenennen, löschen') + '">' + esc(s.name) + (s.notiz ? ' <span class="nicon">📝</span>' : '') + '</td>';
       k.kats.forEach(c => {
         if (isNoteKat(c)){
           if (!G[c.id].length) h += '<td class="catstart"></td>';
@@ -1755,20 +1758,43 @@
       }}]);
   }
 
+  const refreshView = () => { if (DB.view === 'sitz') renderSitz(); else renderBuch(); };
   function openSchueler(k, s){
-    openDialog('Schüler·in bearbeiten',
-      '<div class="field"><label>Name</label><input type="text" id="sName" value="' + esc(s.name) + '"></div>',
+    const foto = fotoCache.get(s.id);
+    const stamp = t => new Date(t).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+    openDialog('Schüler·in – ' + k.name,
+      '<div class="row" style="align-items:flex-end;gap:12px">' + (foto ? '<img src="' + foto + '" class="minifoto" alt="">' : '') +
+      '<div class="field" style="flex:1;margin:0"><label>Name</label><input type="text" id="sName" value="' + esc(s.name) + '"></div></div>' +
+      '<div class="field" style="margin-top:14px"><div class="row" style="justify-content:space-between"><label for="sNotiz" style="margin:0;font-weight:600;font-size:13px">Notizen</label>' +
+      '<button type="button" class="btn" id="sDatum" style="padding:3px 10px">📅 Datum einfügen</button></div>' +
+      '<textarea id="sNotiz" rows="9" placeholder="z. B. Beobachtungen, Elterngespräche, Förderhinweise, Absprachen …" style="margin-top:6px">' + esc(s.notiz || '') + '</textarea>' +
+      '<div class="hint">' + (s.notizAt ? 'Zuletzt geändert: ' + stamp(s.notizAt) + ' · ' : '') +
+      'Die Notizen werden wie die Noten gespeichert (bei Passwortschutz verschlüsselt).</div></div>',
       [{label:'Löschen', cls:'danger', onClick:() => {
-        if (!confirm('„' + s.name + '“ mit allen Noten aus ' + k.name + ' löschen?')) return false;
+        if (!confirm('„' + s.name + '“ mit allen Noten und Notizen aus ' + k.name + ' löschen?')) return false;
         k.schueler = k.schueler.filter(x => x !== s);
         if (k.sitz && k.sitz.pos) delete k.sitz.pos[s.id];
         idbDel(s.id).catch(() => {}); fotoCache.delete(s.id);
         k.leistungen.forEach(l => delete l.werte[s.id]);
-        saveDB(); renderBuch();
+        saveDB(); refreshView();
       }}, {label:'Abbrechen'}, {label:'Speichern', cls:'primary', onClick:() => {
         const n = dq('#sName').value.trim(); if (!n) return false;
-        s.name = n; saveDB(); renderBuch();
-      }}]);
+        const notiz = dq('#sNotiz').value.replace(/\s+$/, '');
+        if (notiz !== (s.notiz || '')){
+          if (notiz){ s.notiz = notiz; s.notizAt = Date.now(); } else { delete s.notiz; delete s.notizAt; }
+        }
+        s.name = n; saveDB(); refreshView();
+      }}], true);
+    // Enter im Notizfeld beginnt eine neue Zeile (statt zu speichern)
+    dq('#sNotiz').addEventListener('keydown', e => { if (e.key === 'Enter') e.stopPropagation(); });
+    dq('#sDatum').onclick = () => {
+      const ta = dq('#sNotiz'), d = new Date().toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'}) + ': ';
+      const a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a, before = ta.value.slice(0, a);
+      const pre = before && !before.endsWith('\n') ? '\n' : '';
+      ta.value = before + pre + d + ta.value.slice(b);
+      const np = (before + pre + d).length; ta.focus(); ta.setSelectionRange(np, np);
+    };
+    setTimeout(() => { const ta = dq('#sNotiz'); if (ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 30);
   }
 
   /* ---------- Klassenarbeiten / Tests: drei Arten der Eintragung ---------- */
@@ -2961,7 +2987,7 @@
       (k.schueler.length ? '' : '<div class="sbempty">Diese Klasse hat noch keine Schüler·innen.</div>') +
       '</div><div class="stray noprint" id="sbTray"><div class="lbl">Noch ohne Platz (' + free.length + ')</div>' +
       (free.length ? free.map(s => '<div class="tcard" data-tsid="' + s.id + '"><span class="tava" data-ava="' + s.id + '">' + AVATAR + '</span><span>' + esc(dispName(s.name)) + '</span></div>').join('') : '<div class="hint">Alle sitzen. 👍</div>') +
-      '<div class="hint" style="margin-top:8px">Zum Entfernen eine Karte vom Plan hierher ziehen.</div></div></div>';
+      '<div class="hint" style="margin-top:8px">Zum Entfernen eine Karte vom Plan hierher ziehen. Namen antippen für Notizen.</div></div></div>';
     main.innerHTML = h;
     main.classList.toggle('sitzfull', sitzFull);
     document.body.classList.toggle('noscroll', sitzFull);
@@ -2970,7 +2996,7 @@
   function card(s, p){
     return '<div class="scard" data-sid="' + s.id + '" style="left:' + (p.x * 100) + '%;top:' + (p.y * 100) + '%">' +
       '<button type="button" class="sava" data-ava="' + s.id + '" title="Foto aufnehmen oder auswählen">' + AVATAR + '<span class="cam">📷</span></button>' +
-      '<div class="sname">' + esc(dispName(s.name)) + '</div></div>';
+      '<div class="sname">' + esc(dispName(s.name)) + (s.notiz ? ' <span class="nicon">📝</span>' : '') + '</div></div>';
   }
   async function loadAvatars(k){
     const urls = await Promise.all(k.schueler.map(s => fotoGet(s.id).catch(() => null)));
@@ -3043,7 +3069,7 @@
     const board = $('sbBoard'); if (board) board.classList.remove('dropok', 'totray');
     if (d.ghost) d.ghost.remove();
     const sp = sitzOf(d.k), s = d.k.schueler.find(x => x.id === d.sid);
-    if (!d.moved){ if (d.ava && s) photoMenu(d.k, s); return; }
+    if (!d.moved){ if (d.ava && s) photoMenu(d.k, s); else if (s) openSchueler(d.k, s); return; }
     if (e.type === 'pointercancel'){ renderSitz(); return; }
     const p = boardPos(e, board);
     if (d.fromBoard && overTray(e)) delete sp.pos[d.sid];
