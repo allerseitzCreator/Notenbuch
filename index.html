@@ -24,7 +24,7 @@
   header.top{background:var(--card);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
   h1{font-size:21px;margin:0;display:flex;align-items:stretch;gap:11px}
   h1 .logo{width:42px;height:42px;flex:none;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:23px}
-  h1 .titles{display:flex;flex-direction:column;justify-content:space-between;height:42px}
+  h1 .titles{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;height:42px}
   h1 .appname{color:var(--accent);font-weight:700;font-size:24px;line-height:18px;margin-top:0.5px;padding-top:0}
   h1 .byline{font-size:12px;font-weight:300;color:#1d2330;white-space:nowrap;line-height:9px;margin-bottom:1px}
   h2{font-size:16px;margin:0 0 12px}
@@ -3071,6 +3071,20 @@
     DB.aktiv = li.dataset.skid; sitzFull = false; saveDB(); renderSitz();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && sitzFull && !dlg.open){ sitzFull = false; renderSitz(); } });
+
+  /* ---------- Kopfzeile: „created by Markus Seitz“ genau so breit wie „Notenbuch“ ---------- */
+  function fitByline(){
+    const a = document.querySelector('h1 .appname'), b = document.querySelector('h1 .byline'); if (!a || !b) return;
+    b.style.fontSize = '12px'; b.style.letterSpacing = '0px';
+    const wa = a.getBoundingClientRect().width, wb = b.getBoundingClientRect().width; if (!wa || !wb) return;
+    b.style.fontSize = Math.max(9, Math.min(16, 12 * wa / wb)) + 'px';
+    const wb2 = b.getBoundingClientRect().width, n = b.textContent.length;
+    if (n > 1) b.style.letterSpacing = ((wa - wb2) / (n - 1)) + 'px';
+    b.style.marginRight = '-' + b.style.letterSpacing;   // Abstand nach dem letzten Buchstaben ausgleichen
+  }
+  fitByline();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitByline);
+  window.addEventListener('load', fitByline);
 
   /* ============================================================
      Ansicht wechseln
