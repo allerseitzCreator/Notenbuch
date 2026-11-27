@@ -288,6 +288,10 @@
   details.help li{margin-bottom:6px}
   pre.cfg{background:#1d2330;color:#e8eefc;border-radius:8px;padding:10px;font-size:12px;overflow:auto;margin:6px 0}
   #syncStatus a{color:var(--accent)}
+  .folderbox{display:flex;gap:10px;align-items:flex-start;background:var(--accent-soft);border:1px solid #c6d4f7;border-radius:10px;padding:10px 12px;margin-bottom:12px}
+  .folderbox .ficon{font-size:22px;line-height:1.2}
+  .folderbox .flabel{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:4px}
+  .folderbox input{font-weight:600}
   dialog::backdrop{background:rgba(20,25,35,.4)}
   .dlgform{padding:20px 22px}
   .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -3110,6 +3114,11 @@
   }
 
   /* ---------- Option 1: Sicherung speichern / laden (iCloud Drive) ---------- */
+  // Ablageordner: Safari erlaubt keine Ordnerwahl durch die App – der Ordner wird als Merkhilfe angezeigt
+  const FOLDER_PH = 'z. B. iCloud Drive › Notenbuch › 2026-27';
+  const folderBox = (id, txt) => '<div class="folderbox"><span class="ficon">📁</span><div style="flex:1"><div class="flabel">' + txt + '</div>' +
+    '<input type="text" id="' + id + '" value="' + esc(SY.folder || '') + '" placeholder="' + FOLDER_PH + '"></div></div>';
+  const bindFolder = id => { const el = dq('#' + id); if (el) el.addEventListener('input', () => { SY.folder = el.value.trim(); saveSY(); renderSyncStatus(); }); };
   const backupName = () => { const d = new Date(), p = n => String(n).padStart(2, '0');
     return 'Notenbuch-Sicherung_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + '-' + p(d.getMinutes()) + '.json'; };
   function needsBackup(){
@@ -3120,7 +3129,8 @@
   }
   function openSicherung(){
     const canShare = !!(navigator.canShare && window.File);
-    const html = '<div class="keybox" style="margin-bottom:12px"><div>Letzte Sicherung: <b>' + fmtTS(SY.meta.savedAt) + '</b></div><div>Letzte Änderung: <b>' + fmtTS((DB.meta || {}).changedAt) + '</b></div></div>' +
+    const html = folderBox('bFolder', 'Speichern in diesem Ordner:') +
+      '<div class="keybox" style="margin-bottom:12px"><div>Letzte Sicherung: <b>' + fmtTS(SY.meta.savedAt) + '</b></div><div>Letzte Änderung: <b>' + fmtTS((DB.meta || {}).changedAt) + '</b></div></div>' +
       '<label class="chk" style="font-weight:600"><input type="checkbox" id="bEnc" checked> mit Passwort verschlüsseln (empfohlen)</label>' +
       '<div id="bPwBox" style="margin:8px 0 0 22px"><div class="grid2"><div class="field"><label>Passwort für die Sicherung</label><input type="password" id="bPw" autocomplete="new-password"></div>' +
       '<div class="field"><label>Passwort wiederholen</label><input type="password" id="bPw2" autocomplete="new-password"></div></div>' +
@@ -3131,6 +3141,7 @@
       '<li><b>Anderes Gerät:</b> „Sicherung laden …“ und die neueste Datei aus iCloud Drive wählen.</li></ul></details><div id="bReady"></div>';
     openDialog('Sicherung speichern', html, [{label:'Schließen'}, {label:'Sicherung erstellen', cls:'primary', onClick:() => { make(); return false; }}]);
     dq('#bEnc').addEventListener('change', e => { dq('#bPwBox').style.display = e.target.checked ? '' : 'none'; });
+    bindFolder('bFolder');
     async function make(){
       const enc = dq('#bEnc').checked; let pw = '';
       if (enc){
@@ -3145,7 +3156,8 @@
       catch(err){ box.innerHTML = '<div class="warn">Die Sicherung konnte nicht erstellt werden.</div>'; return; }
       const name = backupName(), file = window.File ? new File([text], name, {type:'application/json'}) : null;
       const shareOk = !!(file && navigator.canShare && navigator.canShare({files:[file]}));
-      box.innerHTML = '<div class="readybox"><b>✓ Sicherung bereit</b> – ' + esc(name) + (enc ? ' (verschlüsselt)' : '') + '<div class="row" style="margin-top:8px;flex-wrap:wrap">' +
+      box.innerHTML = '<div class="readybox"><b>✓ Sicherung bereit</b> – ' + esc(name) + (enc ? ' (verschlüsselt)' : '') +
+        (SY.folder ? '<div style="margin-top:6px">Im nächsten Fenster bitte diesen Ordner wählen: <b>📁 ' + esc(SY.folder) + '</b></div>' : '') + '<div class="row" style="margin-top:8px;flex-wrap:wrap">' +
         (shareOk ? '<button type="button" class="btn primary" id="bShare">Teilen / In Dateien sichern …</button>' : '') +
         '<button type="button" class="btn' + (shareOk ? '' : ' primary') + '" id="bDl">Herunterladen</button></div></div>';
       const done = t => { SY.meta.savedAt = Date.now(); saveSY(); renderSyncStatus(); if (DB.view === 'buch') renderBuch(); box.insertAdjacentHTML('beforeend', '<div class="hint" style="color:#2e9e4f">' + t + ' ✓</div>'); };
@@ -3186,7 +3198,13 @@
     setView('buch'); renderSyncStatus(); scheduleSync(1000);
   }
   $('exportJson').onclick = () => openSicherung();
-  $('importBtn').onclick = () => $('importFile').click();
+  $('importBtn').onclick = () => {
+    if (!SY.folder) return $('importFile').click();
+    openDialog('Sicherung laden', folderBox('lFolder', 'Die Sicherung liegt in diesem Ordner:') +
+      '<p class="hint">Im nächsten Fenster diesen Ordner öffnen und die <b>neueste</b> Datei wählen (Datum und Uhrzeit stehen im Dateinamen).</p>',
+      [{label:'Abbrechen'}, {label:'Datei auswählen …', cls:'primary', onClick:() => { $('importFile').click(); }}]);
+    bindFolder('lFolder');
+  };
   $('importFile').onchange = e => {
     const f = e.target.files[0]; if (!f) return;
     const rd = new FileReader();
@@ -3280,7 +3298,7 @@
        ['icloud', 'iCloud Drive – von Hand', 'Sicherung verschlüsselt in iCloud Drive speichern und auf dem anderen Gerät laden. Mit Erinnerung.'],
        ['nas', 'Synology-NAS – automatisch', 'Abgleich im Hintergrund über WebDAV, verschlüsselt. Einmalige Einrichtung an der NAS nötig.']]
         .map(o => '<label class="modus"><input type="radio" name="syMode" value="' + o[0] + '"' + (SY.mode === o[0] ? ' checked' : '') + '><span><b>' + o[1] + '</b><small>' + o[2] + '</small></span></label>').join('') + '</div></div>' +
-      '<div id="syIcloud"><div class="field"><label>Erinnerung an die Sicherung</label><select id="syRemind">' +
+      '<div id="syIcloud">' + folderBox('syFolder', 'Ablageordner in iCloud Drive (wird beim Speichern und Laden angezeigt):') + '<div class="field"><label>Erinnerung an die Sicherung</label><select id="syRemind">' +
         [[1, 'täglich, wenn sich etwas geändert hat'], [3, 'alle 3 Tage'], [7, 'wöchentlich'], [0, 'nie']].map(o => '<option value="' + o[0] + '"' + (+SY.remind === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
         '</select></div><div class="hint">Gesichert wird über „Sicherung speichern …“ in der Seitenleiste.</div></div>' +
       '<div id="syNas">' + (httpsOk ? '' : '<div class="warn">Die NAS-Synchronisierung funktioniert nur in der App bzw. über die Web-Adresse (https).</div>') +
@@ -3334,7 +3352,7 @@
         SEC = {pass:n.pass, syncpw:n.syncpw};
         if (changedTarget){ SY.meta.rev = null; SY.meta.dirty = DB.klassen.length > 0; }
       } else { SEC = null; }
-      SY.mode = mode; SY.remind = +dq('#syRemind').value;
+      SY.mode = mode; SY.remind = +dq('#syRemind').value; SY.folder = (dq('#syFolder').value || '').trim();
       await saveSecrets(); saveSY();
       dlg.close(); renderSyncStatus(); renderBuch();
       if (mode === 'nas') doSync(true);
@@ -3346,7 +3364,7 @@
     const el = $('syncStatus'); if (!el) return;
     const m = DB.meta || {}, open = m.changedAt && (!SY.meta.savedAt || m.changedAt > SY.meta.savedAt);
     let h = '';
-    if (SY.mode === 'icloud') h = 'iCloud Drive · letzte Sicherung: <b>' + agoText(SY.meta.savedAt) + '</b>' + (open ? '<br><span style="color:var(--warn)">● ungesicherte Änderungen</span>' : '');
+    if (SY.mode === 'icloud') h = 'iCloud Drive' + (SY.folder ? ' · 📁 ' + esc(SY.folder) : '') + '<br>letzte Sicherung: <b>' + agoText(SY.meta.savedAt) + '</b>' + (open ? '<br><span style="color:var(--warn)">● ungesicherte Änderungen</span>' : '');
     else if (SY.mode === 'nas'){
       if (isLocked()) h = 'NAS · gesperrt';
       else if (!SEC) h = '<span style="color:var(--warn)">● NAS: Zugangsdaten fehlen</span>';
