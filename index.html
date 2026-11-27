@@ -270,6 +270,16 @@
   .side li .liact button:hover{background:#fff;color:var(--accent)}
   .side li .liact button.del:hover{color:var(--bad);background:var(--bad-bg)}
   .tplload{background:var(--accent-soft);border-radius:10px;padding:10px 12px}
+  #lockScreen{position:fixed;inset:0;z-index:1000;background:linear-gradient(160deg,#eef2fb,#f5f6f8);display:grid;place-items:center;padding:20px}
+  body.locked{overflow:hidden}
+  .lkbox{background:#fff;border:1px solid var(--line);border-radius:18px;padding:30px 28px;width:min(380px,100%);text-align:center;box-shadow:0 20px 50px rgba(30,40,70,.12);display:flex;flex-direction:column;gap:10px}
+  .lkbox h2{margin:6px 0 0;font-size:20px}
+  .lklogo{width:56px;height:56px;border-radius:14px;background:var(--accent);color:#fff;font-size:30px;font-weight:700;display:grid;place-items:center;margin:0 auto}
+  .lkbox input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;text-align:center}
+  .lkbox .btn{width:100%;padding:10px;font-size:15px}
+  #lkErr{color:var(--bad);font-size:13px;min-height:18px}
+  .lockbtn{white-space:nowrap}
+  @media print{#lockScreen{display:none!important}}
   dialog::backdrop{background:rgba(20,25,35,.4)}
   .dlgform{padding:20px 22px}
   .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -314,10 +324,13 @@
 <body>
 <header class="top">
   <h1><span class="logo">N</span><span class="appname">Notenbuch</span><span class="byline">- created by Markus Seitz</span></h1>
+  <div class="row" style="gap:10px">
+  <button type="button" class="btn lockbtn" id="lockBtn" hidden title="Notenbuch sperren">🔒 Sperren</button>
   <nav class="tabs" id="appTabs">
     <button data-view="buch">Notenbuch</button>
     <button data-view="rechner">Notenschlüssel-Rechner</button>
   </nav>
+  </div>
 </header>
 
 <!-- ======================= NOTENBUCH ======================= -->
@@ -335,6 +348,9 @@
       <input type="file" id="importFile" accept=".json,application/json" hidden>
       <div class="hint">Alle Daten liegen nur in diesem Browser auf diesem Gerät. Regelmäßig sichern!</div>
       <div class="hint" id="offlineStatus" style="margin-top:8px"></div>
+      <h3>Passwortschutz</h3>
+      <div class="hint" id="schutzStatus" style="margin:0 0 8px"></div>
+      <button class="btn" id="schutzBtn" type="button">Passwortschutz …</button>
     </aside>
     <section class="card" id="buchMain" style="min-width:0"></section>
   </div>
@@ -480,6 +496,17 @@
 </div>
 
 <dialog id="dlg"></dialog>
+<div id="lockScreen" hidden>
+  <div class="lkbox">
+    <div class="lklogo">N</div>
+    <h2>Notenbuch ist gesperrt</h2>
+    <p class="hint" style="margin:0 0 16px">Bitte Passwort eingeben.</p>
+    <input type="password" id="lkPw" autocomplete="current-password" placeholder="Passwort">
+    <button type="button" class="btn primary" id="lkGo">Entsperren</button>
+    <button type="button" class="btn" id="lkBio" hidden>Mit Touch ID / Face ID entsperren</button>
+    <div id="lkErr"></div>
+  </div>
+</div>
 <div id="smPicker" hidden></div>
 
 <script>
@@ -502,6 +529,42 @@
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
   const csvCell = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  /* ============================================================
+     Passwortschutz – Kern (Verschlüsselung der gespeicherten Daten)
+     ============================================================ */
+  const ENC_KEY = 'notenbuch-enc';
+  let LOCK = null;
+  try { LOCK = JSON.parse(localStorage.getItem(ENC_KEY)); } catch(e) { LOCK = null; }
+  if (LOCK && !(LOCK.pw && LOCK.data)) LOCK = null;
+  let DEK = null, DEKraw = null;          // Datenschlüssel – nur im Speicher, solange entsperrt
+  const isLocked = () => !!LOCK && !DEK;
+  const TE = new TextEncoder(), TD = new TextDecoder();
+  const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+  const b64e = buf => { const a = new Uint8Array(buf); let s = ''; for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); return btoa(s); };
+  const b64d = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
+  const PW_ITER = 310000;
+  async function kekFromPw(pw, salt, iter){
+    const base = await crypto.subtle.importKey('raw', TE.encode(pw), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt', 'decrypt']);
+  }
+  async function kekFromPrf(prf){
+    const base = await crypto.subtle.importKey('raw', prf, 'HKDF', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({name:'HKDF', hash:'SHA-256', salt:new Uint8Array(32), info:TE.encode('notenbuch-touchid')}, base, {name:'AES-GCM', length:256}, false, ['encrypt', 'decrypt']);
+  }
+  async function seal(key, bytes){ const iv = rnd(12); const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, bytes); return {iv:b64e(iv), ct:b64e(ct)}; }
+  async function unseal(key, box){ return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(box.iv)}, key, b64d(box.ct))); }
+  async function setDEK(raw){ DEKraw = raw; DEK = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']); }
+  async function sealPw(pw){ const salt = rnd(16); const box = await seal(await kekFromPw(pw, salt, PW_ITER), DEKraw); return Object.assign(box, {salt:b64e(salt), iter:PW_ITER}); }
+  let encSeq = 0;
+  async function persistEnc(){
+    if (!LOCK || !DEK) return;
+    const my = ++encSeq;
+    const box = await seal(DEK, TE.encode(JSON.stringify({db:DB, s:S})));
+    if (my !== encSeq) return;
+    LOCK.data = box; LOCK.savedAt = Date.now();
+    try { localStorage.setItem(ENC_KEY, JSON.stringify(LOCK)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); }
+  }
+
 
   /* ============================================================
      Notenschlüssel – Berechnung
@@ -515,9 +578,9 @@
     kurs:   {total:60, step:0.5, sockel:20, typ:'linear', topAuto:true, top:95, knick:45, exp:1, custom:{}}
   };
   let S;
-  try { S = JSON.parse(localStorage.getItem('notenschluessel-v1')) || null; } catch(e) { S = null; }
+  try { S = LOCK ? null : JSON.parse(localStorage.getItem('notenschluessel-v1')) || null; } catch(e) { S = null; }
   if (!S || !S.mittel || !S.kurs) S = copy(DEF);
-  const save = () => { try { localStorage.setItem('notenschluessel-v1', JSON.stringify(S)); } catch(e){} };
+  const save = () => { if (LOCK){ if (DEK) persistEnc(); return; } try { localStorage.setItem('notenschluessel-v1', JSON.stringify(S)); } catch(e){} };
   const cur = () => S[S.stufe];
 
   function mLabel(v, skala){
@@ -615,10 +678,10 @@
      Notenbuch – Daten
      ============================================================ */
   let DB;
-  try { DB = JSON.parse(localStorage.getItem('notenbuch-v1')); } catch(e) { DB = null; }
+  try { DB = LOCK ? null : JSON.parse(localStorage.getItem('notenbuch-v1')); } catch(e) { DB = null; }
   if (!DB || !Array.isArray(DB.klassen)) DB = {klassen:[], aktiv:null, view:'buch'};
   if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
-  const saveDB = () => { try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
+  const saveDB = () => { if (LOCK){ if (DEK) persistEnc(); return; } try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
   const aktKlasse = () => DB.klassen.find(k => k.id === DB.aktiv) || null;
 
   /* ---------- Smiley-Eingabe direkt in der Tabelle ---------- */
@@ -2773,7 +2836,212 @@
     setView(b.dataset.view);
   });
 
+  /* ============================================================
+     Passwortschutz – Sperrbildschirm, Einstellungen, Touch ID / Face ID
+     ============================================================ */
+  const canCrypto = !!(window.crypto && crypto.subtle);
+  const bioAvailable = async () => {
+    try { return !!(window.PublicKeyCredential && /^https:$/.test(location.protocol) && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }
+    catch(e){ return false; }
+  };
+  async function bioCreate(){
+    const prfSalt = rnd(32);
+    const cred = await navigator.credentials.create({publicKey:{
+      rp:{name:'Notenbuch'}, user:{id:rnd(16), name:'Notenbuch', displayName:'Notenbuch (' + location.host + ')'},
+      challenge:rnd(32), pubKeyCredParams:[{type:'public-key', alg:-7}, {type:'public-key', alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform', residentKey:'preferred', userVerification:'required'},
+      timeout:60000, extensions:{prf:{eval:{first:prfSalt}}}}});
+    const ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
+    if (!ext.prf || ext.prf.enabled === false) throw new Error('nosupport');
+    return {credId:b64e(cred.rawId), prfSalt:b64e(prfSalt), first: ext.prf.results && ext.prf.results.first ? new Uint8Array(ext.prf.results.first) : null};
+  }
+  async function bioGet(bio){
+    const a = await navigator.credentials.get({publicKey:{challenge:rnd(32), allowCredentials:[{type:'public-key', id:b64d(bio.credId)}],
+      userVerification:'required', timeout:60000, extensions:{prf:{eval:{first:b64d(bio.prfSalt)}}}}});
+    const r = a.getClientExtensionResults ? a.getClientExtensionResults() : {};
+    if (!r.prf || !r.prf.results || !r.prf.results.first) throw new Error('nosupport');
+    return new Uint8Array(r.prf.results.first);
+  }
+
+  // --- Sperrbildschirm ---
+  const lockEl = $('lockScreen');
+  function showLock(msg){
+    try { if (dlg.open) dlg.close(); } catch(e){}
+    try { hidePicker(); } catch(e){}
+    lockEl.hidden = false; document.body.classList.add('locked');
+    $('lkBio').hidden = !(LOCK && LOCK.bio);
+    $('lkErr').textContent = msg || '';
+    $('lkPw').value = '';
+    setTimeout(() => $('lkPw').focus(), 50);
+    updateLockUI();
+  }
+  async function afterUnlock(){
+    const data = JSON.parse(TD.decode(await unseal(DEK, LOCK.data)));
+    DB = data.db || {klassen:[], aktiv:null, view:'buch'};
+    if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
+    if (data.s && data.s.mittel && data.s.kurs) S = data.s;
+    lockEl.hidden = true; document.body.classList.remove('locked');
+    lastAct = Date.now(); updateLockUI();
+    setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+  }
+  async function unlockPw(){
+    const pw = $('lkPw').value; if (!pw) return;
+    $('lkErr').textContent = ''; $('lkGo').disabled = true; $('lkGo').textContent = 'Prüfe …';
+    try {
+      const raw = await unseal(await kekFromPw(pw, b64d(LOCK.pw.salt), LOCK.pw.iter || PW_ITER), LOCK.pw);
+      await setDEK(raw); await afterUnlock();
+    } catch(e){ DEK = null; DEKraw = null; $('lkErr').textContent = 'Das Passwort ist falsch.'; $('lkPw').select(); }
+    $('lkGo').disabled = false; $('lkGo').textContent = 'Entsperren';
+  }
+  async function unlockBio(){
+    $('lkErr').textContent = '';
+    try {
+      const prf = await bioGet(LOCK.bio);
+      await setDEK(await unseal(await kekFromPrf(prf), LOCK.bio));
+      await afterUnlock();
+    } catch(e){
+      DEK = null; DEKraw = null;
+      $('lkErr').textContent = e && e.name === 'NotAllowedError' ? 'Abgebrochen – bitte erneut versuchen oder Passwort eingeben.' : 'Touch ID / Face ID hat nicht funktioniert – bitte das Passwort verwenden.';
+    }
+  }
+  $('lkGo').onclick = unlockPw;
+  $('lkPw').addEventListener('keydown', e => { if (e.key === 'Enter') unlockPw(); });
+  $('lkBio').onclick = unlockBio;
+
+  async function lockNow(){
+    if (!LOCK || !DEK) return;
+    if (entry) finishEntry(true);
+    await persistEnc();
+    DEK = null; DEKraw = null;
+    DB = {klassen:[], aktiv:null, view:DB.view, vorlagen:[]}; S = copy(DEF);
+    if ($('list')) $('list').value = '';
+    if ($('calcPts')) $('calcPts').value = '';
+    setView(DB.view === 'rechner' ? 'rechner' : 'buch');   // Oberfläche ohne Daten neu aufbauen
+    showLock();
+  }
+
+  // --- automatische Sperre ---
+  let lastAct = Date.now();
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(ev => document.addEventListener(ev, () => { lastAct = Date.now(); }, {passive:true, capture:true}));
+  const checkIdle = () => { if (LOCK && DEK && +LOCK.timeout > 0 && Date.now() - lastAct > LOCK.timeout * 60000) lockNow(); };
+  setInterval(checkIdle, 10000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkIdle(); });
+
+  function updateLockUI(){
+    const b = $('lockBtn'); if (b) b.hidden = !(LOCK && DEK);
+    const s = $('schutzStatus');
+    if (s) s.innerHTML = LOCK ? '🔒 Passwortschutz an' + (+LOCK.timeout > 0 ? ' · Sperre nach ' + LOCK.timeout + ' Min.' : '') + (LOCK.bio ? ' · Touch ID / Face ID' : '') : 'Passwortschutz aus';
+  }
+  $('lockBtn').onclick = () => lockNow();
+
+  // --- Einstellungen ---
+  const TIMEOUTS = [[1, '1 Minute'], [5, '5 Minuten'], [10, '10 Minuten'], [15, '15 Minuten'], [30, '30 Minuten'], [60, '1 Stunde'], [0, 'nie (nur manuell sperren)']];
+  const timeoutSel = (id, val) => '<select id="' + id + '">' + TIMEOUTS.map(t => '<option value="' + t[0] + '"' + (+val === t[0] ? ' selected' : '') + '>' + t[1] + '</option>').join('') + '</select>';
+
+  async function bioSetupInto(box){
+    // eigener Klick nötig (Safari verlangt eine Benutzeraktion für Touch ID / Face ID)
+    box.innerHTML = '<div class="row" style="flex-wrap:wrap"><button type="button" class="btn primary" id="bioGo">Touch ID / Face ID jetzt einrichten</button></div><div class="hint" id="bioMsg"></div>';
+    $('bioGo').onclick = async () => {
+      const msg = $('bioMsg');
+      try {
+        msg.textContent = 'Bitte mit Touch ID / Face ID bestätigen …';
+        const r = await bioCreate();
+        const finish = async first => {
+          LOCK.bio = Object.assign(await seal(await kekFromPrf(first), DEKraw), {credId:r.credId, prfSalt:r.prfSalt});
+          await persistEnc(); updateLockUI();
+          box.innerHTML = '<div class="readybox">✓ Touch ID / Face ID ist eingerichtet. Beim nächsten Sperren kannst du damit entsperren.</div>';
+        };
+        if (r.first) return finish(r.first);
+        // manche Systeme liefern den Schlüssel erst bei der ersten Anmeldung
+        box.innerHTML = '<div class="hint">Fast fertig – bitte noch einmal bestätigen:</div><button type="button" class="btn primary" id="bioGo2">Mit Touch ID / Face ID bestätigen</button><div class="hint" id="bioMsg2"></div>';
+        $('bioGo2').onclick = async () => {
+          try { await finish(await bioGet({credId:r.credId, prfSalt:r.prfSalt})); }
+          catch(e){ $('bioMsg2').textContent = 'Das hat nicht geklappt. Dein System unterstützt Touch ID / Face ID für Web-Apps vermutlich noch nicht (nötig: macOS 15 bzw. iPadOS 18.4 oder neuer, iCloud-Schlüsselbund aktiv).'; }
+        };
+      } catch(e){
+        msg.textContent = e && e.name === 'NotAllowedError' ? 'Abgebrochen.' :
+          'Touch ID / Face ID kann hier nicht verwendet werden (nötig: Safari mit macOS 15 bzw. iPadOS 18.4 oder neuer und aktivem iCloud-Schlüsselbund). Das Passwort funktioniert weiterhin.';
+      }
+    };
+  }
+
+  async function openSchutz(){
+    if (!canCrypto) return alert('Verschlüsselung ist hier nicht verfügbar. Bitte das Notenbuch über die Web-Adresse bzw. die Dock-App öffnen.');
+    const bioOk = await bioAvailable();
+    if (!LOCK){
+      openDialog('Passwortschutz einschalten',
+        '<p style="margin-top:0">Die Noten werden auf diesem Gerät <b>verschlüsselt</b> gespeichert. Beim Öffnen – und nach einer einstellbaren Zeit ohne Benutzung – muss das Passwort eingegeben werden.</p>' +
+        '<div class="warn"><b>Wichtig:</b> Ohne Passwort lassen sich die Daten nicht wiederherstellen. Bitte das Passwort sicher notieren und vorher eine <b>Sicherung herunterladen</b>.</div>' +
+        '<div class="grid2"><div class="field"><label>Passwort (mind. 6 Zeichen)</label><input type="password" id="sPw" autocomplete="new-password"></div>' +
+        '<div class="field"><label>Passwort wiederholen</label><input type="password" id="sPw2" autocomplete="new-password"></div></div>' +
+        '<div class="field"><label>Automatisch sperren nach</label>' + timeoutSel('sTo', 10) + '</div>' +
+        (bioOk ? '<label class="chk"><input type="checkbox" id="sBio" checked> anschließend Touch ID / Face ID einrichten</label>'
+               : '<div class="hint">Touch ID / Face ID ist hier nicht verfügbar' + (/^https:$/.test(location.protocol) ? '' : ' (nur über die Web-Adresse bzw. die Dock-App)') + '.</div>') +
+        '<div id="sBioBox" style="margin-top:10px"></div>',
+        [{label:'Abbrechen'}, {label:'Schutz einschalten', cls:'primary', onClick:() => {
+          const pw = dq('#sPw').value;
+          if (pw.length < 6){ alert('Bitte ein Passwort mit mindestens 6 Zeichen wählen.'); dq('#sPw').focus(); return false; }
+          if (pw !== dq('#sPw2').value){ alert('Die beiden Passwörter stimmen nicht überein.'); dq('#sPw2').focus(); return false; }
+          const to = +dq('#sTo').value, wantBio = dq('#sBio') && dq('#sBio').checked;
+          (async () => {
+            await setDEK(rnd(32));
+            LOCK = {v:1, timeout:to, pw: await sealPw(pw), data:null};
+            await persistEnc();
+            try { localStorage.removeItem('notenbuch-v1'); localStorage.removeItem('notenschluessel-v1'); } catch(e){}
+            lastAct = Date.now(); updateLockUI();
+            if (wantBio){
+              openDialog('Passwortschutz ist eingeschaltet', '<div class="readybox">✓ Deine Noten werden jetzt verschlüsselt gespeichert.</div><div id="sBioBox2" style="margin-top:12px"></div>', [{label:'Fertig', cls:'primary'}]);
+              bioSetupInto(dq('#sBioBox2'));
+            } else alert('Passwortschutz ist eingeschaltet. Deine Noten werden jetzt verschlüsselt gespeichert.');
+          })();
+        }}]);
+      return;
+    }
+    // Schutz ist an
+    openDialog('Passwortschutz',
+      '<div class="readybox" style="margin:0 0 12px">🔒 Deine Noten werden verschlüsselt gespeichert.</div>' +
+      '<div class="field"><label>Automatisch sperren nach</label>' + timeoutSel('sTo', LOCK.timeout) + '</div>' +
+      '<div class="field"><span class="lbl">Touch ID / Face ID</span><div id="sBioBox">' +
+        (LOCK.bio ? '<div class="row"><span>✓ eingerichtet</span><button type="button" class="btn" id="bioDel">entfernen</button></div>'
+          : bioOk ? '' : '<div class="hint" style="margin:0">Auf diesem Gerät nicht verfügbar.</div>') + '</div></div>' +
+      '<details class="help"><summary>Passwort ändern</summary><div class="grid3" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px">' +
+        '<div class="field"><label>Bisheriges</label><input type="password" id="cOld" autocomplete="current-password"></div>' +
+        '<div class="field"><label>Neues</label><input type="password" id="cNew" autocomplete="new-password"></div>' +
+        '<div class="field"><label>Neues wiederholen</label><input type="password" id="cNew2" autocomplete="new-password"></div></div>' +
+        '<button type="button" class="btn" id="cGo">Passwort ändern</button> <span class="hint" id="cMsg"></span></details>' +
+      '<details class="help"><summary>Passwortschutz ausschalten</summary><div class="field" style="margin-top:8px"><label>Passwort zur Bestätigung</label><input type="password" id="oPw" autocomplete="current-password"></div>' +
+        '<button type="button" class="btn danger" style="margin-right:0" id="oGo">Schutz ausschalten (Daten unverschlüsselt speichern)</button> <span class="hint" id="oMsg"></span></details>',
+      [{label:'Jetzt sperren', onClick:() => { setTimeout(lockNow, 0); }}, {label:'Schließen', cls:'primary'}]);
+    dq('#sTo').addEventListener('change', e => { LOCK.timeout = +e.target.value; persistEnc(); updateLockUI(); });
+    if (!LOCK.bio && bioOk) bioSetupInto(dq('#sBioBox'));
+    if (dq('#bioDel')) dq('#bioDel').onclick = async () => {
+      if (!confirm('Touch ID / Face ID für das Notenbuch entfernen? Das Passwort funktioniert weiterhin.')) return;
+      delete LOCK.bio; await persistEnc(); updateLockUI(); dlg.close(); openSchutz();
+    };
+    const checkPw = async pw => { await unseal(await kekFromPw(pw, b64d(LOCK.pw.salt), LOCK.pw.iter || PW_ITER), LOCK.pw); };
+    dq('#cGo').onclick = async () => {
+      const m = dq('#cMsg'), n1 = dq('#cNew').value;
+      try { await checkPw(dq('#cOld').value); } catch(e){ m.textContent = 'Bisheriges Passwort ist falsch.'; return; }
+      if (n1.length < 6){ m.textContent = 'Neues Passwort: mind. 6 Zeichen.'; return; }
+      if (n1 !== dq('#cNew2').value){ m.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
+      LOCK.pw = await sealPw(n1); await persistEnc(); m.textContent = '✓ Passwort geändert.';
+      ['#cOld', '#cNew', '#cNew2'].forEach(id => dq(id).value = '');
+    };
+    dq('#oGo').onclick = async () => {
+      const m = dq('#oMsg');
+      try { await checkPw(dq('#oPw').value); } catch(e){ m.textContent = 'Passwort ist falsch.'; return; }
+      if (!confirm('Passwortschutz wirklich ausschalten? Die Noten werden danach unverschlüsselt auf diesem Gerät gespeichert.')) return;
+      encSeq++; LOCK = null; DEK = null; DEKraw = null;
+      try { localStorage.removeItem(ENC_KEY); } catch(e){}
+      save(); saveDB(); updateLockUI(); dlg.close();
+      alert('Passwortschutz ist ausgeschaltet.');
+    };
+  }
+  $('schutzBtn').onclick = () => openSchutz();
+  updateLockUI();
+
   setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+  if (LOCK) showLock();
 })();
 </script>
 </body>
