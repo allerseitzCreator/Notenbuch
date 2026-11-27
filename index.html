@@ -298,7 +298,7 @@
   .sboard{position:relative;aspect-ratio:16/10;background:#fbfcfe;border:2px solid var(--line);border-radius:14px;overflow:hidden;touch-action:none;
     background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:calc(100%/24) calc(100%/20);background-position:-1px -1px}
   .sboard.dropok{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  .tafel{position:absolute;top:2.5%;left:30%;right:30%;height:5%;background:#2f4f3a;color:#e9f3ec;border-radius:6px;display:grid;place-items:center;font-size:12px;letter-spacing:.2em;text-transform:uppercase}
+  .tafel{position:absolute;bottom:2.5%;left:30%;right:30%;height:5%;background:#2f4f3a;color:#e9f3ec;border-radius:6px;display:grid;place-items:center;font-size:12px;letter-spacing:.2em;text-transform:uppercase}
   .scard{position:absolute;transform:translate(-50%,-50%);width:9.2%;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
   .scard.dragging{z-index:5;cursor:grabbing;filter:drop-shadow(0 6px 10px rgba(0,0,0,.18))}
   .sava{position:relative;width:min(62px,100%);aspect-ratio:1;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:0;background:#fff;cursor:pointer;overflow:visible;line-height:0}
@@ -2928,7 +2928,14 @@
   const dispName = n => { const m = String(n).split(/,\s*/); return m.length > 1 && m[1] ? m[1] + ' ' + m[0] : n; };
   const AVATAR = '<svg viewBox="0 0 64 64" class="ava-ph"><circle cx="32" cy="32" r="32" fill="#e3e8f2"/><circle cx="32" cy="25" r="11" fill="#b5bfd3"/><path d="M12 54c3-11 11-16 20-16s17 5 20 16" fill="#b5bfd3"/></svg>';
   let sitzFull = false;
-  function sitzOf(k){ k.sitz = k.sitz || {pos:{}, raster:true}; k.sitz.pos = k.sitz.pos || {}; return k.sitz; }
+  function sitzOf(k){
+    k.sitz = k.sitz || {pos:{}, raster:true, tafel:'unten'}; k.sitz.pos = k.sitz.pos || {};
+    if (k.sitz.tafel !== 'unten'){   // ältere Pläne (Tafel oben) spiegeln
+      Object.values(k.sitz.pos).forEach(p => { p.y = Math.min(0.88, Math.max(0.05, 1 - p.y)); });
+      k.sitz.tafel = 'unten';
+    }
+    return k.sitz;
+  }
 
   function renderSitzList(){
     $('sitzKlassen').innerHTML = DB.klassen.length
@@ -3000,7 +3007,7 @@
   const snap = (v, n) => Math.round(v * n) / n;
   function boardPos(e, board){
     const r = board.getBoundingClientRect();
-    return {x:Math.min(0.96, Math.max(0.04, (e.clientX - r.left) / r.width)), y:Math.min(0.95, Math.max(0.12, (e.clientY - r.top) / r.height)), inside: e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom};
+    return {x:Math.min(0.96, Math.max(0.04, (e.clientX - r.left) / r.width)), y:Math.min(0.88, Math.max(0.05, (e.clientY - r.top) / r.height)), inside: e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom};
   }
   const overTray = e => { const t = $('sbTray'); if (!t) return false; const r = t.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
   let drag = null;
@@ -3052,7 +3059,7 @@
       const list = k.schueler.slice(), n = list.length; if (!n) return;
       if (Object.keys(sp.pos).length && !confirm('Alle Schüler·innen neu anordnen? Die bisherigen Plätze werden überschrieben.')) return;
       const cols = Math.min(n, Math.ceil(Math.sqrt(n * 1.8))), rows = Math.ceil(n / cols);
-      list.forEach((s, i) => { const r = Math.floor(i / cols), c = i % cols; sp.pos[s.id] = {x:0.07 + 0.86 * (c + 0.5) / cols, y:0.2 + 0.74 * (r + 0.5) / rows}; });
+      list.forEach((s, i) => { const r = Math.floor(i / cols), c = i % cols; sp.pos[s.id] = {x:0.07 + 0.86 * (c + 0.5) / cols, y:0.06 + 0.74 * (r + 0.5) / rows}; });
       saveDB(); renderSitz();
     } else if (a === 'clear'){ if (confirm('Alle Schüler·innen vom Plan nehmen?')){ sp.pos = {}; saveDB(); renderSitz(); } }
     else if (a === 'full'){ sitzFull = !sitzFull; renderSitz(); }
