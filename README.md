@@ -25,6 +25,11 @@ Digitales Notenbuch mit integriertem Notenschlüssel-Rechner – eine einzelne H
 - Schnitte je Kategorie, Gesamtschnitt, Klassenschnitt, Zeugnisspalte
 - **Auswertung** einer Arbeit: Notenbild, Gesamtpunkteverteilung, Schnitt und Punkteverteilung je Aufgabe – als Balkendiagramm oder Zahlen, Export als **PDF** (eine Seite, farbig) und **CSV**
 
+### Sitzplan
+- für jede Klasse ein Sitzplan: Schüler·innen per Ziehen (Maus oder Finger) auf dem Plan verteilen, automatisch anordnen, drucken, Vollbild
+- Foto-Symbol über dem Namen: auf dem iPad Foto mit der Kamera aufnehmen oder ein vorhandenes Bild wählen
+- Fotos werden lokal gespeichert (bei Passwortschutz verschlüsselt) und mit Sicherung bzw. Synchronisierung übertragen
+
 ### Notenschlüssel-Rechner
 - Mittelstufe (ganze, halbe oder Viertelnoten) und Kursstufe (00–15 VP)
 - Gesamtpunktzahl, Punkteschritte, Sockel, Bestnote

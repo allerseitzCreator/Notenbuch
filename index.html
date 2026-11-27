@@ -292,6 +292,38 @@
   .folderbox .ficon{font-size:22px;line-height:1.2}
   .folderbox .flabel{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:4px}
   .folderbox input{font-weight:600}
+  .sitzhead{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .sitzwrap{display:grid;grid-template-columns:1fr 190px;gap:14px;align-items:start}
+  @media (max-width:900px){.sitzwrap{grid-template-columns:1fr}}
+  .sboard{position:relative;aspect-ratio:16/10;background:#fbfcfe;border:2px solid var(--line);border-radius:14px;overflow:hidden;touch-action:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:calc(100%/24) calc(100%/20);background-position:-1px -1px}
+  .sboard.dropok{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .tafel{position:absolute;top:2.5%;left:30%;right:30%;height:5%;background:#2f4f3a;color:#e9f3ec;border-radius:6px;display:grid;place-items:center;font-size:12px;letter-spacing:.2em;text-transform:uppercase}
+  .scard{position:absolute;transform:translate(-50%,-50%);width:9.2%;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+  .scard.dragging{z-index:5;cursor:grabbing;filter:drop-shadow(0 6px 10px rgba(0,0,0,.18))}
+  .sava{position:relative;width:min(62px,100%);aspect-ratio:1;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:0;background:#fff;cursor:pointer;overflow:visible;line-height:0}
+  .sava svg,.sava img,.tava svg,.tava img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+  .sava .cam{position:absolute;right:-4px;bottom:-4px;font-size:12px;background:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .sava.hasimg .cam{opacity:0}
+  .scard:hover .sava.hasimg .cam{opacity:1}
+  .sname{background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12px;font-weight:600;max-width:120px;text-align:center;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sboard.totray .dragging{opacity:.5}
+  .stray{background:var(--bg);border-radius:12px;padding:10px;max-height:70vh;overflow:auto}
+  .tcard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 10px 4px 4px;margin-bottom:6px;font-size:13px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+  .tava{width:30px;height:30px;flex:none;line-height:0}
+  .tcard.ghost{position:fixed;z-index:2000;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 8px 20px rgba(0,0,0,.2)}
+  .sbempty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
+  #sitzMain.sitzfull{position:fixed;inset:0;z-index:900;border-radius:0;overflow:auto;padding:14px 18px}
+  #sitzMain.sitzfull .sboard{max-height:calc(100vh - 110px);margin:0 auto}
+  body.noscroll{overflow:hidden}
+  .bigfoto{width:220px;height:220px;border-radius:50%;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+  #sitzKlassen{list-style:none;margin:0 0 12px;padding:0}
+  @media print{
+    #view-sitz .sitzwrap{display:block}
+    #view-sitz .sboard{border:1px solid #999;background-image:none;page-break-inside:avoid}
+    #sitzMain .cam{display:none}
+    #sitzMain.sitzfull{position:static}
+  }
   dialog::backdrop{background:rgba(20,25,35,.4)}
   .dlgform{padding:20px 22px}
   .dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
@@ -340,6 +372,7 @@
   <button type="button" class="btn lockbtn" id="lockBtn" hidden title="Notenbuch sperren">🔒 Sperren</button>
   <nav class="tabs" id="appTabs">
     <button data-view="buch">Notenbuch</button>
+    <button data-view="sitz">Sitzplan</button>
     <button data-view="rechner">Notenschlüssel-Rechner</button>
   </nav>
   </div>
@@ -367,6 +400,18 @@
       <button class="btn" id="schutzBtn" type="button">Passwortschutz …</button>
     </aside>
     <section class="card" id="buchMain" style="min-width:0"></section>
+  </div>
+</div>
+
+<!-- ======================= SITZPLAN ======================= -->
+<div id="view-sitz" class="wrap" hidden>
+  <div class="buch">
+    <aside class="card side noprint">
+      <h2>Klassen &amp; Kurse</h2>
+      <ul id="sitzKlassen"></ul>
+      <div class="hint">Klasse antippen, um ihren Sitzplan zu öffnen. Klassen werden im Notenbuch angelegt.</div>
+    </aside>
+    <section class="card" id="sitzMain" style="min-width:0"></section>
   </div>
 </div>
 
@@ -569,6 +614,68 @@
   async function unseal(key, box){ return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d(box.iv)}, key, b64d(box.ct))); }
   async function setDEK(raw){ DEKraw = raw; DEK = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']); }
   async function sealPw(pw){ const salt = rnd(16); const box = await seal(await kekFromPw(pw, salt, PW_ITER), DEKraw); return Object.assign(box, {salt:b64e(salt), iter:PW_ITER}); }
+
+  /* ============================================================
+     Schülerfotos (IndexedDB; bei Passwortschutz verschlüsselt)
+     ============================================================ */
+  let idbP = null;
+  const idb = () => idbP || (idbP = new Promise((res, rej) => {
+    const r = indexedDB.open('notenbuch-fotos', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('fotos');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const idbReq = (mode, fn) => idb().then(db => new Promise((res, rej) => {
+    const tx = db.transaction('fotos', mode), rq = fn(tx.objectStore('fotos'));
+    tx.oncomplete = () => res(rq && 'result' in rq ? rq.result : undefined); tx.onerror = () => rej(tx.error);
+  }));
+  const idbGet = k => idbReq('readonly', st => st.get(k));
+  const idbPut = (k, v) => idbReq('readwrite', st => st.put(v, k));
+  const idbDel = k => idbReq('readwrite', st => st.delete(k));
+  const idbKeys = () => idbReq('readonly', st => st.getAllKeys());
+  const fotoCache = new Map();
+  async function fotoGet(sid){
+    if (fotoCache.has(sid)) return fotoCache.get(sid);
+    let rec; try { rec = await idbGet(sid); } catch(e){ return null; }
+    if (!rec) return null;
+    let url = null;
+    if (rec.box){ if (!DEK) return null; try { url = TD.decode(await unseal(DEK, rec.box)); } catch(e){ return null; } }
+    else url = rec.url || null;
+    if (url) fotoCache.set(sid, url);
+    return url;
+  }
+  async function fotoPutRaw(sid, url){ await idbPut(sid, LOCK && DEK ? {box: await seal(DEK, TE.encode(url))} : {url}); fotoCache.set(sid, url); }
+  async function fotoAll(){
+    const out = {}; let keys = [];
+    try { keys = await idbKeys(); } catch(e){ return out; }
+    for (const k of keys){ const u = await fotoGet(k); if (u) out[k] = u; }
+    return out;
+  }
+  async function fotoImport(map){ for (const [k, u] of Object.entries(map || {})) if (typeof u === 'string' && u.startsWith('data:image')) await fotoPutRaw(k, u); }
+  // nach Ein-/Ausschalten des Passwortschutzes alle Fotos neu ablegen (verschlüsselt bzw. unverschlüsselt)
+  async function fotoRewrap(encrypt, key){
+    let keys = []; try { keys = await idbKeys(); } catch(e){ return; }
+    for (const k of keys){
+      const rec = await idbGet(k); if (!rec) continue;
+      let url = rec.url; if (rec.box){ try { url = TD.decode(await unseal(key, rec.box)); } catch(e){ continue; } }
+      if (!url) continue;
+      await idbPut(k, encrypt ? {box: await seal(key, TE.encode(url))} : {url});
+    }
+  }
+  // Bild verkleinern und quadratisch zuschneiden (spart Speicher)
+  function fotoFromFile(file){
+    return new Promise((res, rej) => {
+      const img = new Image(), u = URL.createObjectURL(file);
+      img.onload = () => {
+        const S2 = 200, c = document.createElement('canvas'); c.width = c.height = S2;
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth - side) / 2, sy = Math.max(0, (img.naturalHeight - side) * 0.35);
+        c.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, S2, S2);
+        URL.revokeObjectURL(u); res(c.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Bild konnte nicht gelesen werden')); };
+      img.src = u;
+    });
+  }
   let encSeq = 0;
   async function persistEnc(){
     if (!LOCK || !DEK) return;
@@ -1653,6 +1760,8 @@
       [{label:'Löschen', cls:'danger', onClick:() => {
         if (!confirm('„' + s.name + '“ mit allen Noten aus ' + k.name + ' löschen?')) return false;
         k.schueler = k.schueler.filter(x => x !== s);
+        if (k.sitz && k.sitz.pos) delete k.sitz.pos[s.id];
+        idbDel(s.id).catch(() => {}); fotoCache.delete(s.id);
         k.leistungen.forEach(l => delete l.werte[s.id]);
         saveDB(); renderBuch();
       }}, {label:'Abbrechen'}, {label:'Speichern', cls:'primary', onClick:() => {
@@ -2814,15 +2923,160 @@
   });
 
   /* ============================================================
+     Sitzplan
+     ============================================================ */
+  const dispName = n => { const m = String(n).split(/,\s*/); return m.length > 1 && m[1] ? m[1] + ' ' + m[0] : n; };
+  const AVATAR = '<svg viewBox="0 0 64 64" class="ava-ph"><circle cx="32" cy="32" r="32" fill="#e3e8f2"/><circle cx="32" cy="25" r="11" fill="#b5bfd3"/><path d="M12 54c3-11 11-16 20-16s17 5 20 16" fill="#b5bfd3"/></svg>';
+  let sitzFull = false;
+  function sitzOf(k){ k.sitz = k.sitz || {pos:{}, raster:true}; k.sitz.pos = k.sitz.pos || {}; return k.sitz; }
+
+  function renderSitzList(){
+    $('sitzKlassen').innerHTML = DB.klassen.length
+      ? DB.klassen.map(k => '<li data-skid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span class="kn">' + esc(k.name) + '</span><span class="badge">' + k.schueler.length + '</span></li>').join('')
+      : '<li class="empty">Noch keine Klassen angelegt – im Notenbuch anlegen.</li>';
+  }
+  function renderSitz(){
+    renderSitzList();
+    const k = aktKlasse(), main = $('sitzMain');
+    if (!k){ main.innerHTML = '<div class="emptystate"><h2>Sitzplan</h2><p>Links eine Klasse auswählen.</p></div>'; return; }
+    const sp = sitzOf(k);
+    const placed = k.schueler.filter(s => sp.pos[s.id]), free = k.schueler.filter(s => !sp.pos[s.id]);
+    let h = '<div class="sitzhead noprint"><div><h2 style="margin:0">Sitzplan ' + esc(k.name) + '</h2><div class="summary" style="margin:2px 0 0">' + placed.length + ' von ' + k.schueler.length + ' platziert · Namen auf den Plan ziehen, Foto-Symbol antippen für ein Foto</div></div>' +
+      '<div class="toolbar"><label class="chk" style="margin:0 6px 0 0"><input type="checkbox" id="spRaster"' + (sp.raster ? ' checked' : '') + '> am Raster ausrichten</label>' +
+      '<button class="btn" type="button" data-sp="auto">Automatisch anordnen</button>' +
+      '<button class="btn" type="button" data-sp="clear">Alle zurücklegen</button>' +
+      '<button class="btn" type="button" data-sp="full">' + (sitzFull ? 'Vollbild beenden' : 'Vollbild') + '</button>' +
+      '<button class="btn" type="button" data-sp="print">Drucken</button></div></div>' +
+      '<div class="printhead"><h1>Sitzplan ' + esc(k.name) + '</h1></div>' +
+      '<div class="sitzwrap"><div class="sboard" id="sbBoard"><div class="tafel">Tafel</div>' +
+      placed.map(s => card(s, sp.pos[s.id])).join('') +
+      (k.schueler.length ? '' : '<div class="sbempty">Diese Klasse hat noch keine Schüler·innen.</div>') +
+      '</div><div class="stray noprint" id="sbTray"><div class="lbl">Noch ohne Platz (' + free.length + ')</div>' +
+      (free.length ? free.map(s => '<div class="tcard" data-tsid="' + s.id + '"><span class="tava" data-ava="' + s.id + '">' + AVATAR + '</span><span>' + esc(dispName(s.name)) + '</span></div>').join('') : '<div class="hint">Alle sitzen. 👍</div>') +
+      '<div class="hint" style="margin-top:8px">Zum Entfernen eine Karte vom Plan hierher ziehen.</div></div></div>';
+    main.innerHTML = h;
+    main.classList.toggle('sitzfull', sitzFull);
+    document.body.classList.toggle('noscroll', sitzFull);
+    loadAvatars(k);
+  }
+  function card(s, p){
+    return '<div class="scard" data-sid="' + s.id + '" style="left:' + (p.x * 100) + '%;top:' + (p.y * 100) + '%">' +
+      '<button type="button" class="sava" data-ava="' + s.id + '" title="Foto aufnehmen oder auswählen">' + AVATAR + '<span class="cam">📷</span></button>' +
+      '<div class="sname">' + esc(dispName(s.name)) + '</div></div>';
+  }
+  async function loadAvatars(k){
+    const urls = await Promise.all(k.schueler.map(s => fotoGet(s.id).catch(() => null)));
+    k.schueler.forEach((s, i) => {
+      const url = urls[i]; if (!url) return;
+      document.querySelectorAll('#sitzMain [data-ava="' + s.id + '"]').forEach(el => {
+        const keep = el.querySelector('.cam'); el.innerHTML = '<img src="' + url + '" alt="">' + (keep ? '<span class="cam">📷</span>' : ''); el.classList.add('hasimg');
+      });
+    });
+  }
+
+  // --- Foto aufnehmen / auswählen ---
+  function pickPhoto(k, s, camera){
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    if (camera) inp.setAttribute('capture', 'environment');
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      try { const url = await fotoFromFile(f); await fotoPutRaw(s.id, url); s.fotoAt = Date.now(); saveDB(); renderSitz(); }
+      catch(e){ alert('Das Bild konnte nicht verwendet werden.'); }
+    };
+    inp.click();
+  }
+  // muss ohne „await“ vor pickPhoto laufen, sonst blockiert Safari Kamera/Dateiauswahl
+  function photoMenu(k, s){
+    const url = fotoCache.get(s.id);
+    if (!url) return pickPhoto(k, s, false);   // iPad: Auswahl „Foto aufnehmen“ / „Fotomediathek“ / „Datei“
+    openDialog(dispName(s.name), '<div style="text-align:center"><img src="' + url + '" class="bigfoto" alt=""></div>',
+      [{label:'Foto entfernen', cls:'danger', onClick:async () => { await idbDel(s.id); fotoCache.delete(s.id); s.fotoAt = Date.now(); saveDB(); renderSitz(); }},
+       {label:'Bild auswählen …', onClick:() => { pickPhoto(k, s, false); }},
+       {label:'📷 Foto aufnehmen', cls:'primary', onClick:() => { pickPhoto(k, s, true); }}]);
+  }
+
+  // --- Ziehen & Ablegen (Maus und Finger) ---
+  const snap = (v, n) => Math.round(v * n) / n;
+  function boardPos(e, board){
+    const r = board.getBoundingClientRect();
+    return {x:Math.min(0.96, Math.max(0.04, (e.clientX - r.left) / r.width)), y:Math.min(0.95, Math.max(0.12, (e.clientY - r.top) / r.height)), inside: e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom};
+  }
+  const overTray = e => { const t = $('sbTray'); if (!t) return false; const r = t.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
+  let drag = null;
+  $('sitzMain').addEventListener('pointerdown', e => {
+    const k = aktKlasse(); if (!k) return;
+    const ava = e.target.closest('[data-ava]'), c = e.target.closest('.scard'), t = e.target.closest('.tcard');
+    const el = c || t; if (!el) return;
+    const sid = c ? c.dataset.sid : t.dataset.tsid;
+    drag = {k, sid, el, fromBoard:!!c, sx:e.clientX, sy:e.clientY, moved:false, ava:!!ava, ghost:null, id:e.pointerId};
+    try { el.setPointerCapture(e.pointerId); } catch(err){}
+    e.preventDefault();
+  });
+  $('sitzMain').addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
+    drag.moved = true;
+    const board = $('sbBoard');
+    if (drag.fromBoard){
+      const p = boardPos(e, board);
+      drag.el.style.left = (p.x * 100) + '%'; drag.el.style.top = (p.y * 100) + '%';
+      drag.el.classList.add('dragging');
+      board.classList.toggle('totray', overTray(e));
+    } else {
+      if (!drag.ghost){ drag.ghost = drag.el.cloneNode(true); drag.ghost.classList.add('ghost'); document.body.appendChild(drag.ghost); }
+      drag.ghost.style.left = e.clientX + 'px'; drag.ghost.style.top = e.clientY + 'px';
+      board.classList.toggle('dropok', boardPos(e, board).inside);
+    }
+  });
+  const endDrag = e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null;
+    const board = $('sbBoard'); if (board) board.classList.remove('dropok', 'totray');
+    if (d.ghost) d.ghost.remove();
+    const sp = sitzOf(d.k), s = d.k.schueler.find(x => x.id === d.sid);
+    if (!d.moved){ if (d.ava && s) photoMenu(d.k, s); return; }
+    if (e.type === 'pointercancel'){ renderSitz(); return; }
+    const p = boardPos(e, board);
+    if (d.fromBoard && overTray(e)) delete sp.pos[d.sid];
+    else if (p.inside || d.fromBoard) sp.pos[d.sid] = sp.raster ? {x:snap(p.x, 24), y:snap(p.y, 20)} : {x:p.x, y:p.y};
+    saveDB(); renderSitz();
+  };
+  $('sitzMain').addEventListener('pointerup', endDrag);
+  $('sitzMain').addEventListener('pointercancel', endDrag);
+  $('sitzMain').addEventListener('change', e => { if (e.target.id === 'spRaster'){ const k = aktKlasse(); if (k){ sitzOf(k).raster = e.target.checked; saveDB(); } } });
+  $('sitzMain').addEventListener('click', e => {
+    const b = e.target.closest('[data-sp]'); if (!b) return;
+    const k = aktKlasse(); if (!k) return; const sp = sitzOf(k), a = b.dataset.sp;
+    if (a === 'auto'){
+      const list = k.schueler.slice(), n = list.length; if (!n) return;
+      if (Object.keys(sp.pos).length && !confirm('Alle Schüler·innen neu anordnen? Die bisherigen Plätze werden überschrieben.')) return;
+      const cols = Math.min(n, Math.ceil(Math.sqrt(n * 1.8))), rows = Math.ceil(n / cols);
+      list.forEach((s, i) => { const r = Math.floor(i / cols), c = i % cols; sp.pos[s.id] = {x:0.07 + 0.86 * (c + 0.5) / cols, y:0.2 + 0.74 * (r + 0.5) / rows}; });
+      saveDB(); renderSitz();
+    } else if (a === 'clear'){ if (confirm('Alle Schüler·innen vom Plan nehmen?')){ sp.pos = {}; saveDB(); renderSitz(); } }
+    else if (a === 'full'){ sitzFull = !sitzFull; renderSitz(); }
+    else if (a === 'print') window.print();
+  });
+  $('sitzKlassen').addEventListener('click', e => {
+    const li = e.target.closest('li[data-skid]'); if (!li) return;
+    DB.aktiv = li.dataset.skid; sitzFull = false; saveDB(); renderSitz();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && sitzFull && !dlg.open){ sitzFull = false; renderSitz(); } });
+
+  /* ============================================================
      Ansicht wechseln
      ============================================================ */
+  const safeView = v => ['buch', 'sitz', 'rechner'].includes(v) ? v : 'buch';
   function setView(v){
     if (entry) finishEntry(true);
     DB.view = v; saveDB();
     document.querySelectorAll('#appTabs button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
     $('view-buch').hidden = v !== 'buch';
     $('view-rechner').hidden = v !== 'rechner';
-    if (v === 'buch') renderBuch(); else renderRechner();
+    $('view-sitz').hidden = v !== 'sitz';
+    if (v !== 'sitz'){ sitzFull = false; document.body.classList.remove('noscroll'); }
+    if (v === 'buch') renderBuch(); else if (v === 'sitz') renderSitz(); else renderRechner();
   }
   $('appTabs').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || b.dataset.view === DB.view) return;
@@ -2880,7 +3134,7 @@
     lockEl.hidden = true; document.body.classList.remove('locked');
     lastAct = Date.now(); updateLockUI();
     resetTracking(); await loadSecrets();
-    setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+    setView(safeView(DB.view));
     renderSyncStatus(); scheduleSync(1500);
   }
   async function unlockPw(){
@@ -2911,11 +3165,11 @@
     if (!LOCK || !DEK) return;
     if (entry) finishEntry(true);
     await persistEnc();
-    DEK = null; DEKraw = null; SEC = null; clearTimeout(syncTimer);
+    DEK = null; DEKraw = null; SEC = null; clearTimeout(syncTimer); fotoCache.clear();
     DB = {klassen:[], aktiv:null, view:DB.view, vorlagen:[]}; S = copy(DEF);
     if ($('list')) $('list').value = '';
     if ($('calcPts')) $('calcPts').value = '';
-    setView(DB.view === 'rechner' ? 'rechner' : 'buch');   // Oberfläche ohne Daten neu aufbauen
+    setView(safeView(DB.view));   // Oberfläche ohne Daten neu aufbauen
     showLock();
   }
 
@@ -2986,6 +3240,7 @@
             await setDEK(rnd(32));
             LOCK = {v:1, timeout:to, pw: await sealPw(pw), data:null};
             await persistEnc();
+            await fotoRewrap(true, DEK); fotoCache.clear();
             try { localStorage.removeItem('notenbuch-v1'); localStorage.removeItem('notenschluessel-v1'); } catch(e){}
             await saveSecrets();
             lastAct = Date.now(); updateLockUI();
@@ -3031,6 +3286,7 @@
       const m = dq('#oMsg');
       try { await checkPw(dq('#oPw').value); } catch(e){ m.textContent = 'Passwort ist falsch.'; return; }
       if (!confirm('Passwortschutz wirklich ausschalten? Die Noten werden danach unverschlüsselt auf diesem Gerät gespeichert.')) return;
+      await fotoRewrap(false, DEK); fotoCache.clear();
       encSeq++; LOCK = null; DEK = null; DEKraw = null;
       try { localStorage.removeItem(ENC_KEY); } catch(e){}
       save(); saveDB(); await saveSecrets(); updateLockUI(); dlg.close();
@@ -3102,7 +3358,7 @@
     return Object.assign({verschluesselt:true, iter:PW_ITER, salt}, extra || {}, box);
   }
   async function decFile(env, pw){ return JSON.parse(TD.decode(await unseal(await fileKey(pw, env.salt, env.iter || PW_ITER), env))); }
-  const payloadNow = () => ({db:DB, s:S});
+  const payloadNow = async () => ({db:DB, s:S, fotos: await fotoAll()});
   function applyPayload(data, keepView){
     const view = DB.view, aktiv = DB.aktiv;
     DB = data.db || data.notenbuch; if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
@@ -3111,6 +3367,7 @@
     if (s && s.mittel && s.kurs){ S = s; delete S.link; delete S.linkBackup; }
     resetTracking();
     save(); saveDB();
+    if (data.fotos) fotoImport(data.fotos).then(() => { if (DB.view === 'sitz') renderSitz(); });
   }
 
   /* ---------- Option 1: Sicherung speichern / laden (iCloud Drive) ---------- */
@@ -3152,7 +3409,7 @@
       const box = dq('#bReady'); box.innerHTML = '<div class="hint">Sicherung wird erstellt …</div>';
       const meta = {app:'notenbuch', version:3, exportiert:new Date().toISOString(), geaendert:(DB.meta || {}).changedAt || null};
       let text;
-      try { text = JSON.stringify(enc ? await encFile(payloadNow(), pw, meta) : Object.assign(meta, {notenbuch:DB, rechner:S})); }
+      try { text = JSON.stringify(enc ? await encFile(await payloadNow(), pw, meta) : Object.assign(meta, {notenbuch:DB, rechner:S, fotos: await fotoAll()})); }
       catch(err){ box.innerHTML = '<div class="warn">Die Sicherung konnte nicht erstellt werden.</div>'; return; }
       const name = backupName(), file = window.File ? new File([text], name, {type:'application/json'}) : null;
       const shareOk = !!(file && navigator.canShare && navigator.canShare({files:[file]}));
@@ -3235,7 +3492,7 @@
     clearTimeout(syncTimer); syncTimer = setTimeout(() => doSync(false), ms || 3000);
   }
   async function push(rev){
-    const env = await encFile(payloadNow(), SEC.syncpw, {app:'notenbuch-sync', v:1, rev, geaendert:(DB.meta || {}).changedAt || Date.now(), geraet:navigator.platform || ''});
+    const env = await encFile(await payloadNow(), SEC.syncpw, {app:'notenbuch-sync', v:1, rev, geaendert:(DB.meta || {}).changedAt || Date.now(), geraet:navigator.platform || ''});
     const r = await nasFetch('PUT', JSON.stringify(env));
     if (!r.ok) throw {status:r.status};
     SY.meta.rev = rev; SY.meta.dirty = false; saveSY();
@@ -3245,7 +3502,7 @@
     if (entry) finishEntry(true);
     applyPayload(data, true);
     SY.meta.rev = env.rev; SY.meta.dirty = false; saveSY();
-    if (!dlg.open) setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+    if (!dlg.open) setView(safeView(DB.view));
   }
   async function doSync(manual){
     if (SY.mode !== 'nas' || !SEC || isLocked() || syncState.busy) return;
@@ -3385,7 +3642,7 @@
   setInterval(renderSyncStatus, 60000);
 
   if (!LOCK){ resetTracking(); loadSecrets(); }
-  setView(DB.view === 'rechner' ? 'rechner' : 'buch');
+  setView(safeView(DB.view));
   renderSyncStatus();
   if (LOCK) showLock(); else scheduleSync(1500);
 })();
