@@ -126,6 +126,22 @@
   table.gb input:hover{border-color:var(--line)}
   table.gb input:focus{background:#fff;border-color:var(--accent);outline:2px solid var(--accent-soft)}
   table.gb input.zeugnis{width:64px;font-weight:700}
+  table.gb th.zcol{cursor:pointer;min-width:74px;background:#f2f5fb}
+  table.gb th.zcol small{display:block;font-weight:400;color:var(--muted);font-size:10.5px;line-height:1.3;margin-top:2px}
+  table.gb td.zc{min-width:74px;position:relative}
+  table.gb td.zc .gbig{display:inline-block;font-size:19px;font-weight:800;line-height:24px}
+  table.gb td.zc input.zin{display:block;width:54px;margin:2px auto 0;text-align:center;font-size:12px;padding:2px 4px;border:1px solid transparent;border-radius:6px;background:rgba(255,255,255,.55);color:inherit}
+  table.gb td.zc input.zin::placeholder{color:transparent}
+  table.gb td.zc input.zin:focus::placeholder{color:var(--muted)}
+  table.gb td.zc input.zin{background:transparent}
+  table.gb td.zc input.zin:placeholder-shown{height:14px;font-size:10px}
+  table.gb td.zc input.zin:hover{border-color:var(--line)}
+  table.gb td.zc input.zin:focus{background:#fff;color:var(--ink);border-color:var(--accent);outline:none}
+  table.gb td.zc.zman::after{content:"✎";position:absolute;top:2px;right:4px;font-size:10px;opacity:.75}
+  table.gb td.zc.zbad{outline:2px solid var(--bad);outline-offset:-2px}
+  .zngrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+  .zngrid label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:3px}
+  @media print{table.gb td.zc input.zin{display:none}}
   table.gb input.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
   table.gb input.skip{color:var(--muted)}
   table.gb .g{display:block;min-height:26px;line-height:0}
@@ -902,7 +918,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '31';
+  const APP_VERSION = '32';
   /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
   const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
   const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
@@ -1103,6 +1119,28 @@
       default:    return x;
     }
   }
+  // Zeugnisnoten: 1. Halbjahr und Endnote
+  const defGrenze = () => { const d = new Date(), y = d.getMonth() >= 7 ? d.getFullYear() + 1 : d.getFullYear(); return y + '-02-01'; };
+  const znOf = k => Object.assign({grenze:defGrenze(), hj:0.25, end:1, regel:'math'}, k.zn || {});
+  const ZN_STUFEN = [[0.25, 'Viertelnoten (z. B. 2-)'], [0.5, 'halbe Noten (z. B. 2-3)'], [1, 'ganze Noten'], [0, 'nicht runden']];
+  function rundNote(k, v, step, regel){
+    if (v == null) return null;
+    if (k.stufe === 'kurs') return Math.min(15, Math.max(0, Math.floor(v + 0.5 + 1e-9)));   // ganze Punkte
+    if (!step) return v;
+    const q = v / step, r = regel === 'gunst' ? Math.ceil(q - 0.5 - 1e-9) : Math.floor(q + 0.5 + 1e-9);
+    return Math.min(6, Math.max(1, r * step));
+  }
+  const znLabel = (k, v, step) => v == null ? '' : k.stufe === 'kurs' ? String(v).padStart(2, '0') : step ? mLabel(v, 'viertel') : num(v, 2);
+  const hjView = k => { const g = znOf(k).grenze; return Object.assign({}, k, {leistungen: k.leistungen.filter(l => l.datum && l.datum < g)}); };
+  // {hj:{avg, r, lbl, eff, man}, end:{…}} – eff = gültige Note (von Hand eingetragen oder berechnet)
+  function znData(k, s, kHJ, st){
+    const z = znOf(k), one = (avg, step, man) => {
+      const r = rundNote(k, avg, step, z.regel), m = String(man || '').trim();
+      const pv = m ? parseGrade(k.stufe, m) : null;
+      return {avg, r, lbl: m || znLabel(k, r, step), calc: znLabel(k, r, step), eff: m ? pv : r, man: !!m};
+    };
+    return {hj: one(stats(kHJ, s.id).total, z.hj, s.hj1), end: one((st || stats(k, s.id)).total, z.end, s.zeugnis)};
+  }
   function stats(k, sid){
     const cat = {}, grp = {};
     for (const c of k.kats){
@@ -1213,7 +1251,10 @@
         '<button type="button" class="catadd noprint" data-addkat="' + c.id + '" title="' + (isNoteKat(c) ? 'Neue Nummer / neue Noten' : isSportKat(c) ? 'Neuer Termin (weitere Spalte)' : 'Neue Arbeit / neuer Test') + '">+</button></th>';
       tagKc(h0, c);
     });
-    h += '<th rowspan="3" class="avgcol">Ø Gesamt</th><th rowspan="3">Zeugnis</th></tr><tr>';
+    { const z = znOf(k), st = v => (ZN_STUFEN.find(x => x[0] === v) || [0, ''])[1].replace(/ \(.*\)/, '');
+      h += '<th rowspan="3" class="avgcol">Ø Gesamt</th>' +
+        '<th rowspan="3" class="zcol" data-act="klasse" title="Einstellungen der Zeugnisnoten ändern">1. HJ<small>bis ' + fmtDate(new Date(new Date(z.grenze).getTime() - 864e5).toISOString().slice(0, 10)) + '<br>' + (k.stufe === 'kurs' ? 'ganze Punkte' : st(z.hj)) + '</small></th>' +
+        '<th rowspan="3" class="zcol" data-act="klasse" title="Einstellungen der Zeugnisnoten ändern">Endnote<small>ganzes Jahr<br>' + (k.stufe === 'kurs' ? 'ganze Punkte' : st(z.end)) + '</small></th></tr><tr>'; }
     // Kopfzeile 2: Arbeiten bzw. Nummern
     k.kats.forEach(c => { const h0 = h.length;
       if (isNoteKat(c)){
@@ -1264,7 +1305,9 @@
         h += '<td class="catavg" id="a-' + c.id + '-' + s.id + '"></td>';
         tagKc(h0, c);
       });
-      h += '<td class="avgcol tot" id="t-' + s.id + '"></td><td><input class="zeugnis" data-z="' + s.id + '" value="' + esc(s.zeugnis || '') + '" autocomplete="off"></td></tr>';
+      h += '<td class="avgcol tot" id="t-' + s.id + '"></td>' +
+        '<td class="zc" id="zh-' + s.id + '"><span class="zg"></span><input class="zin" data-zh="' + s.id + '" value="' + esc(s.hj1 || '') + '" autocomplete="off" title="Leer lassen = berechnete Note; eigene Note eintippen, um sie zu ersetzen"></td>' +
+        '<td class="zc" id="ze-' + s.id + '"><span class="zg"></span><input class="zin" data-z="' + s.id + '" value="' + esc(s.zeugnis || '') + '" autocomplete="off" title="Leer lassen = berechnete Note; eigene Note eintippen, um sie zu ersetzen"></td></tr>';
     });
     const ncols = 4 + k.kats.reduce((a, c) => a + width(c) + 1, 0);
     if (!k.schueler.length) h += '<tr><td colspan="' + ncols + '" class="hintrow">Noch keine Schüler·innen – über „+ Schüler·innen“ eine Namensliste einfügen.</td></tr>';
@@ -1284,7 +1327,7 @@
       h += '<td class="catavg" id="fa-' + c.id + '"></td>';
       tagKc(h0, c);
     });
-    h += '<td class="avgcol tot" id="ft"></td><td></td></tr></tfoot></table></div>';
+    h += '<td class="avgcol tot" id="ft"></td><td class="zc" id="fzh"></td><td class="zc" id="fze"></td></tr></tfoot></table></div>';
     h += '<p class="hint noprint"><b>Arbeiten/Tests:</b> Punkte direkt eintragen, Enter bzw. ↑/↓ wechselt die Zeile. ' +
       '<b>Mündlich u. Ä.:</b> „+“ neben der Nummer klicken – eine neue Spalte mit dem heutigen Datum erscheint, und bei allen Schüler·innen stehen die Smileys zur Auswahl. ' +
       'Ein Feld einer bestehenden Datumsspalte anklicken, um dort Noten zu ändern. Neue Nummer über „+“ neben „Mündlich“. Namen anklicken zum Umbenennen oder Löschen.</p>';
@@ -1343,7 +1386,7 @@
 
   function refreshDerived(){
     const k = aktKlasse(); if (!k) return;
-    const colVals = {}, catVals = {}, grpVals = {}, totVals = [];
+    const colVals = {}, catVals = {}, grpVals = {}, totVals = [], zhVals = [], zeVals = [], kHJ = hjView(k);
     const setT = (id, t) => { const el = $(id); if (el) el.textContent = t; };
     const noteKats = k.kats.filter(isNoteKat), G = {};
     noteKats.forEach(c => G[c.id] = groupsOf(k, c));
@@ -1396,12 +1439,23 @@
       }));
       k.kats.forEach(c => { setT('a-' + c.id + '-' + s.id, fmtAvg(st.cat[c.id])); if (st.cat[c.id] != null) (catVals[c.id] = catVals[c.id] || []).push(st.cat[c.id]); });
       setT('t-' + s.id, fmtAvg(st.total)); if (st.total != null) totVals.push(st.total);
+      const zd = znData(k, s, kHJ, st);
+      [['zh', zd.hj], ['ze', zd.end]].forEach(([p, o]) => {
+        const td = $(p + '-' + s.id); if (!td) return;
+        const cc = o.eff != null ? gradeColors(k.stufe, o.eff) : null;
+        td.querySelector('.zg').innerHTML = o.lbl ? '<span class="gbig">' + esc(o.lbl) + '</span>' : '–';
+        td.classList.toggle('gfill', !!cc); td.style.backgroundColor = cc ? cc.bg : ''; td.style.color = cc ? cc.fg : '';
+        td.classList.toggle('zman', o.man); td.classList.toggle('zbad', o.man && o.eff == null);
+        const inp = td.querySelector('input'); inp.placeholder = o.calc || '';
+        td.title = (o.avg != null ? 'Ø ' + num(o.avg, 2) + ' → berechnet ' + o.calc : 'noch keine Noten') + (o.man ? ' · von Hand eingetragen: ' + o.lbl : '') + '\nEigene Note eintippen ersetzt die berechnete; Feld leeren = wieder berechnet.';
+        if (o.eff != null) (p === 'zh' ? zhVals : zeVals).push(o.eff);
+      });
     });
     const mean = a => a && a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
     k.leistungen.forEach(l => { const el = $('f-' + l.id), a = colVals[l.id]; if (el) el.innerHTML = a ? fmtAvg(mean(a)) + ' <small>(' + a.length + ')</small>' : '–'; });
     noteKats.forEach(c => G[c.id].forEach(g => setT('gf-' + c.id + '-' + g.nr, fmtAvg(mean(grpVals[c.id + ':' + g.nr])))));
     k.kats.forEach(c => setT('fa-' + c.id, fmtAvg(mean(catVals[c.id]))));
-    setT('ft', fmtAvg(mean(totVals)));
+    setT('ft', fmtAvg(mean(totVals))); setT('fzh', fmtAvg(mean(zhVals))); setT('fze', fmtAvg(mean(zeVals)));
   }
 
   /* ---------- Dialog ---------- */
@@ -1425,8 +1479,9 @@
   function openKlasse(k, tpl){
     const isTpl = !!tpl;
     const isNew = !k;
-    const d = isTpl ? {name:tpl.name || '', fach:tpl.fach || '', rundung:tpl.rundung || 'exakt', stufe:tpl.stufe || 'mittel', kats:(tpl.kats || defKats('mittel')).map(c => Object.assign({}, c, {id:uid()}))}
-      : k ? {name:k.name, fach:k.fach || '', rundung:k.rundung || 'exakt', stufe:k.stufe, kats:copy(k.kats)} : {name:'', fach:'', rundung:'exakt', stufe:'mittel', kats:defKats('mittel')};
+    const d = isTpl ? {zn:Object.assign({}, tpl.zn || {}), name:tpl.name || '', fach:tpl.fach || '', rundung:tpl.rundung || 'exakt', stufe:tpl.stufe || 'mittel', kats:(tpl.kats || defKats('mittel')).map(c => Object.assign({}, c, {id:uid()}))}
+      : k ? {zn:znOf(k), name:k.name, fach:k.fach || '', rundung:k.rundung || 'exakt', stufe:k.stufe, kats:copy(k.kats)} : {zn:znOf({}), name:'', fach:'', rundung:'exakt', stufe:'mittel', kats:defKats('mittel')};
+    d.zn = Object.assign(znOf({}), d.zn);
     const locked = !!(k && k.leistungen.length);
     const used = new Set(k ? k.leistungen.map(l => l.kat) : []);
     const html =
@@ -1445,6 +1500,12 @@
       '<div class="field"><label for="kRund">Mit den Schnitten der Kategorien zur Gesamtnote weiterrechnen</label><select id="kRund">' +
         Object.entries(RUNDUNG).map(([v, t]) => '<option value="' + v + '"' + (d.rundung === v ? ' selected' : '') + '>' + t[0].toUpperCase() + t.slice(1) + '</option>').join('') + '</select>' +
         '<div class="hint">Beispiel Schnitt 2,38: exakt 2,38 · abbrechen 2,3 · auf 1 Stelle 2,4 · auf 2 Stellen 2,38. Die Gesamtnote wird dann aus diesen Werten gewichtet berechnet.</div></div>' +
+      '<div class="field"><span class="lbl">Zeugnisnoten (Spalten „1. HJ“ und „Endnote“)</span><div class="zngrid">' +
+        (isTpl ? '' : '<div><label for="kHJ">1. Halbjahr zählt bis vor</label><input type="date" id="kHJ" value="' + esc(d.zn.grenze) + '"></div>') +
+        '<div><label for="kHjSt">1. HJ runden auf</label><select id="kHjSt">' + ZN_STUFEN.map(([v, t]) => '<option value="' + v + '"' + (+d.zn.hj === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div>' +
+        '<div><label for="kEndSt">Endnote runden auf</label><select id="kEndSt">' + ZN_STUFEN.map(([v, t]) => '<option value="' + v + '"' + (+d.zn.end === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div>' +
+        '<div><label for="kRegel">Liegt der Schnitt genau in der Mitte</label><select id="kRegel"><option value="math"' + (d.zn.regel !== 'gunst' ? ' selected' : '') + '>mathematisch: 2,5 → 3</option><option value="gunst"' + (d.zn.regel === 'gunst' ? ' selected' : '') + '>zugunsten: 2,5 → 2</option></select></div>' +
+        '</div><div class="hint">Das 1. HJ rechnet mit allen Einträgen, deren Datum vor dem gewählten Tag liegt; die Endnote mit allen Einträgen des Jahres. Eine Note kann in der Tabelle jederzeit von Hand überschrieben werden. In der Kursstufe wird auf ganze Punkte gerundet.</div></div>' +
       '<div class="field"><label for="kRatio">Gewichtung als Verhältnis</label>' +
       '<input type="text" id="kRatio" value="' + esc(ratioText(d.kats)) + '" placeholder="z. B. 2:1, 4:5 oder 60:40">' +
       '<div class="hint">Reihenfolge wie die Kategorien unten. Auch Dezimalzahlen sind möglich, z. B. 1,5:1.</div></div>' +
@@ -1484,7 +1545,8 @@
       vals.forEach((v, i) => d.kats[i].w = v);
       renderKats(true);
     };
-    const readAll = () => { readKats(); const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value; d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); d.rundung = dq('#kRund').value; };
+    const readAll = () => { readKats(); const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value; d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); d.rundung = dq('#kRund').value; readZn(); };
+    const readZn = () => { if (dq('#kHJ') && dq('#kHJ').value) d.zn.grenze = dq('#kHJ').value; d.zn.hj = +dq('#kHjSt').value; d.zn.end = +dq('#kEndSt').value; d.zn.regel = dq('#kRegel').value; };
     const buttons = [];
     if (isTpl){
       if (tpl.id) buttons.push({label:'Vorlage löschen', cls:'danger', onClick:() => {
@@ -1500,7 +1562,7 @@
         const same = DB.vorlagen.find(x => x.name.toLowerCase() === d.name.toLowerCase() && x.id !== tpl.id);
         if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Überschreiben?')) return false;
         if (same) DB.vorlagen = DB.vorlagen.filter(x => x !== same);
-        saveAsTemplate(d.name, d.stufe, kats, tpl.id, d.fach, d.rundung); setTimeout(openVorlagen, 0);
+        saveAsTemplate(d.name, d.stufe, kats, tpl.id, d.fach, d.rundung, d.zn); setTimeout(openVorlagen, 0);
       }});
     } else {
     if (!isNew) buttons.push({label:'Klasse löschen', cls:'danger', onClick:() => { if (!deleteKlasse(k)) return false; }});
@@ -1511,7 +1573,7 @@
       const name = (prompt('Name der Vorlage (z. B. „Englisch Unterstufe“):', '') || '').trim(); if (!name) return false;
       const same = DB.vorlagen.find(x => x.name.toLowerCase() === name.toLowerCase());
       if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Mit diesen Einstellungen überschreiben?')) return false;
-      saveAsTemplate(name, d.stufe, kats, same ? same.id : null, d.fach, d.rundung);
+      saveAsTemplate(name, d.stufe, kats, same ? same.id : null, d.fach, d.rundung, d.zn);
       const sel = dq('#kTpl');
       const box = dlg.querySelector('.tplload');
       if (box) box.innerHTML = '<label for="kTpl">Vorlage laden</label><select id="kTpl"><option value="">– Vorlage wählen –</option>' + DB.vorlagen.map(v => '<option value="' + v.id + '">' + esc(v.name) + ' (' + stufeName(v.stufe) + ')</option>').join('') + '</select><div class="hint" style="color:#2e9e4f">✓ Vorlage „' + esc(name) + '“ gespeichert.</div>';
@@ -1521,17 +1583,17 @@
     buttons.push({label:'Abbrechen'});
     buttons.push({label: isNew ? 'Anlegen' : 'Speichern', cls:'primary', onClick:() => {
       readKats();
-      d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); d.rundung = dq('#kRund').value;
+      d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); d.rundung = dq('#kRund').value; readZn();
       if (!d.name){ dq('#kName').classList.add('invalid'); dq('#kName').focus(); return false; }
       d.kats = d.kats.filter(c => c.name);
       if (d.kats.length && !d.kats.some(c => +c.w > 0)){ alert('Mindestens eine Kategorie braucht ein Gewicht größer als 0.'); return false; }
       if (!d.kats.length){ alert('Mindestens eine Kategorie ist nötig.'); d.kats = defKats(d.stufe); renderKats(); return false; }
       const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value;
       if (isNew){
-        const nk = {id:uid(), name:d.name, stufe:d.stufe, kats:d.kats, schueler:[], leistungen:[]}; if (d.fach) nk.fach = d.fach; if (d.rundung !== 'exakt') nk.rundung = d.rundung;
+        const nk = {id:uid(), name:d.name, stufe:d.stufe, kats:d.kats, schueler:[], leistungen:[]}; if (d.fach) nk.fach = d.fach; if (d.rundung !== 'exakt') nk.rundung = d.rundung; nk.zn = copy(d.zn);
         DB.klassen.push(nk); DB.aktiv = nk.id;
       } else {
-        k.name = d.name; if (d.fach) k.fach = d.fach; else delete k.fach; if (d.rundung && d.rundung !== 'exakt') k.rundung = d.rundung; else delete k.rundung; if (!locked) k.stufe = d.stufe; k.kats = d.kats;
+        k.name = d.name; if (d.fach) k.fach = d.fach; else delete k.fach; if (d.rundung && d.rundung !== 'exakt') k.rundung = d.rundung; else delete k.rundung; k.zn = copy(d.zn); if (!locked) k.stufe = d.stufe; k.kats = d.kats;
         const ids = new Set(k.kats.map(c => c.id));
         k.leistungen.forEach(l => { if (!ids.has(l.kat)) l.kat = k.kats[0].id; });
       }
@@ -1555,6 +1617,7 @@
         if (!locked){ d.stufe = v.stufe; dlg.querySelectorAll('input[name=kStufe]').forEach(r => r.checked = r.value === v.stufe); }
         if (v.fach && !dq('#kFach').value.trim()) dq('#kFach').value = v.fach;
         if (v.rundung) dq('#kRund').value = v.rundung;
+        if (v.zn){ dq('#kHjSt').value = String(v.zn.hj); dq('#kEndSt').value = String(v.zn.end); dq('#kRegel').value = v.zn.regel || 'math'; }
         renderKats();
         const hint = sel.parentNode.querySelector('.hint');
         if (hint) hint.innerHTML = '✓ Vorlage „' + esc(v.name) + '“ geladen' + (kept.length ? ' – beibehalten, weil schon Noten darin stehen: ' + kept.map(o => esc(o.name)).join(', ') : '') + '. Die Vorlage selbst bleibt unverändert.';
@@ -2027,8 +2090,8 @@
 
   /* ---------- Vorlagen für Kategorien & Gewichtung ---------- */
   const tplSummary = v => v.kats.map(c => (katFarbe(v.kats, c) !== 'keine' ? '<span class="ckey" style="background:' + farbHex(katFarbe(v.kats, c)) + '"></span>' : '') + esc(c.name) + ' ' + num(wPct(v.kats, c), 0) + ' %').join(' · ');
-  function saveAsTemplate(name, stufe, kats, replaceId, fach, rundung){
-    const t = {id: replaceId || uid(), name, stufe, fach: fach || '', rundung: rundung || 'exakt', kats: kats.map(c => ({name:c.name, w:+c.w || 0, typ:katTyp(c), farbe:katFarbe(kats, c)}))};
+  function saveAsTemplate(name, stufe, kats, replaceId, fach, rundung, zn){
+    const t = {id: replaceId || uid(), name, stufe, fach: fach || '', rundung: rundung || 'exakt', zn: zn ? {hj:+zn.hj, end:+zn.end, regel:zn.regel} : undefined, kats: kats.map(c => ({name:c.name, w:+c.w || 0, typ:katTyp(c), farbe:katFarbe(kats, c)}))};
     const i = DB.vorlagen.findIndex(x => x.id === t.id);
     if (i >= 0) DB.vorlagen[i] = t; else DB.vorlagen.push(t);
     DB.vorlagen.sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -2048,7 +2111,7 @@
     dlg.querySelector('.dlgbody').addEventListener('click', e => {
       const ed = e.target.closest('[data-tedit]'), cp = e.target.closest('[data-tcopy]'), del = e.target.closest('[data-tdel]');
       if (ed){ const v = DB.vorlagen.find(x => x.id === ed.dataset.tedit); dlg.close(); openKlasse(null, v); }
-      else if (cp){ const v = DB.vorlagen.find(x => x.id === cp.dataset.tcopy); saveAsTemplate(v.name + ' (Kopie)', v.stufe, v.kats, null, v.fach, v.rundung); dlg.close(); openVorlagen(); }
+      else if (cp){ const v = DB.vorlagen.find(x => x.id === cp.dataset.tcopy); saveAsTemplate(v.name + ' (Kopie)', v.stufe, v.kats, null, v.fach, v.rundung, v.zn); dlg.close(); openVorlagen(); }
       else if (del){ const v = DB.vorlagen.find(x => x.id === del.dataset.tdel); if (confirm('Vorlage „' + v.name + '“ löschen? Bestehende Klassen bleiben unverändert.')){ DB.vorlagen = DB.vorlagen.filter(x => x !== v); saveDB(); dlg.close(); openVorlagen(); } }
     });
   }
@@ -2948,7 +3011,8 @@
       else k.leistungen.filter(l => l.kat === c.id).sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))
         .forEach(l => { head.push(l.name + ' (Punkte)', l.name + ' (Note)'); plan.push({l}); });
     });
-    k.kats.forEach(c => head.push('Ø ' + c.name)); head.push('Ø Gesamt', 'Zeugnis');
+    k.kats.forEach(c => head.push('Ø ' + c.name)); head.push('Ø 1. HJ', '1. HJ', 'Ø Gesamt', 'Endnote');
+    const kHJ = hjView(k);
     const lines = [head.map(csvCell).join(';')];
     keyCache.clear();
     k.schueler.forEach((s, r) => {
@@ -2961,7 +3025,8 @@
         }
       });
       k.kats.forEach(c => row.push(st.cat[c.id] == null ? '' : num(st.cat[c.id], 2)));
-      row.push(st.total == null ? '' : num(st.total, 2), s.zeugnis || '');
+      const zd = znData(k, s, kHJ, st);
+      row.push(zd.hj.avg == null ? '' : num(zd.hj.avg, 2), zd.hj.lbl, st.total == null ? '' : num(st.total, 2), zd.end.lbl);
       lines.push(row.map(csvCell).join(';'));
     });
     download('notenbuch_' + k.name.replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.csv', '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
@@ -3101,7 +3166,9 @@
       if (t.value.trim() === '') delete l.werte[t.dataset.s]; else l.werte[t.dataset.s] = t.value.trim();
       saveDB(); refreshDerived();
     } else if (t.dataset.z){
-      const s = k.schueler.find(x => x.id === t.dataset.z); if (s){ s.zeugnis = t.value; saveDB(); }
+      const s = k.schueler.find(x => x.id === t.dataset.z); if (s){ s.zeugnis = t.value.trim(); saveDB(); refreshDerived(); }
+    } else if (t.dataset.zh){
+      const s = k.schueler.find(x => x.id === t.dataset.zh); if (s){ if (t.value.trim()) s.hj1 = t.value.trim(); else delete s.hj1; saveDB(); refreshDerived(); }
     }
   });
   /* ---------- Smiley-Auswahl zum Ändern einer Einzelnote ---------- */
