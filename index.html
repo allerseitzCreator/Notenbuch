@@ -932,7 +932,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '34';
+  const APP_VERSION = '35';
   /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
   const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
   const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
@@ -1474,7 +1474,9 @@
       const zd = znData(k, s, kHJ, st);
       [['zh', zd.hj], ['ze', zd.end]].forEach(([p, o]) => {
         const td = $(p + '-' + s.id); if (!td) return;
-        const cc = o.eff != null ? gradeColors(k.stufe, o.eff) : null;
+        // Zeugnisnoten: ab 4,5 (Kursstufe: unter 05 VP) rot
+        const rot = o.eff != null && (k.stufe === 'kurs' ? o.eff < 5 : o.eff >= 4.5 - 1e-9);
+        const cc = o.eff == null ? null : rot ? {bg:SM_FARBE[6], fg:'#fff'} : gradeColors(k.stufe, o.eff);
         td.querySelector('.zg').innerHTML = o.lbl ? '<span class="gbig">' + esc(o.lbl) + '</span>' : '–';
         td.classList.toggle('gfill', !!cc); td.style.backgroundColor = cc ? cc.bg : ''; td.style.color = cc ? cc.fg : '';
         td.classList.toggle('zman', o.man); td.classList.toggle('zbad', o.man && o.eff == null);

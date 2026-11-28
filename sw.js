@@ -2,7 +2,7 @@
    Speichert die App beim ersten Öffnen, damit sie auch ohne Internet startet.
    Ist eine Verbindung da, wird immer die neueste Version von GitHub geladen.
    Die Noten selbst werden hier NICHT gespeichert – sie liegen im Browser-Speicher der App. */
-const CACHE = 'notenbuch-app-v34';
+const CACHE = 'notenbuch-app-v35';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './notenbuch-icon2-180.png', './notenbuch-icon2-512.png', './notenbuch-icon2-1024.png'];
 
 self.addEventListener('install', e => {
