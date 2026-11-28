@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Notenbuch">
-<meta name="theme-color" content="#5280d6">
+<meta name="theme-color" content="#6a9aea">
 <link rel="apple-touch-icon" sizes="180x180" href="notenbuch-icon2-180.png">
 <link rel="apple-touch-icon" sizes="1024x1024" href="notenbuch-icon2-1024.png">
 <link rel="icon" type="image/png" sizes="512x512" href="notenbuch-icon2-512.png">
@@ -20,6 +20,11 @@
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
+  /* Installierte App: Band unter der Titelleiste führt deren Farbe als Verlauf fort */
+  @media (display-mode: standalone){
+    body::before{content:"";display:block;height:8px;background:linear-gradient(180deg,#6a9aea,#3a5fbf)}
+  }
+  @media print{body::before{display:none!important}}
   body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
   header.top{background:var(--card);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
   h1{font-size:21px;margin:0;display:flex;align-items:stretch;gap:11px}
