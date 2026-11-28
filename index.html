@@ -172,6 +172,7 @@
   .grow .gname{flex:1;font-size:14px}
   .gseg{flex:none;gap:4px}
   .gseg label{min-width:38px;flex:none;padding:4px 8px}
+  table.gb tr td.pc.struck{background-image:linear-gradient(to top right,transparent calc(50% - 1px),rgba(30,35,45,.55) calc(50% - 1px),rgba(30,35,45,.55) calc(50% + 1px),transparent calc(50% + 1px))!important;opacity:.55}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
   .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
   .emptystate h2{color:var(--ink)}
@@ -901,7 +902,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '28';
+  const APP_VERSION = '29';
   /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
   const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
   const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
@@ -1082,6 +1083,14 @@
     return sw ? sum / sw : null;
   };
 
+  // „Schlechteste Leistung streichen“: welcher Eintrag einer Kategorie fällt bei dieser Person weg? (erst ab 2 Noten)
+  function struckOf(k, c, sid){
+    if (!c.streich || isNoteKat(c)) return null;
+    const ok = k.leistungen.filter(l => l.kat === c.id && +l.gew > 0).map(l => ({l, x:cellVal(k, l, sid)})).filter(o => o.x.state === 'ok');
+    if (ok.length < 2) return null;
+    const worse = k.stufe === 'kurs' ? (a, b) => a.x.v < b.x.v : (a, b) => a.x.v > b.x.v;
+    return ok.reduce((w, o) => worse(o, w) ? o : w).l.id;
+  }
   function stats(k, sid){
     const cat = {}, grp = {};
     for (const c of k.kats){
@@ -1089,7 +1098,7 @@
         const avgs = [];
         groupsOf(k, c).forEach(g => { const a = wmean(k, g.ls, sid); grp[c.id + ':' + g.nr] = a; if (a != null) avgs.push(a); });
         cat[c.id] = avgs.length ? avgs.reduce((x, y) => x + y, 0) / avgs.length : null;
-      } else cat[c.id] = wmean(k, k.leistungen.filter(l => l.kat === c.id), sid);
+      } else { const sk = struckOf(k, c, sid); cat[c.id] = wmean(k, k.leistungen.filter(l => l.kat === c.id && l.id !== sk), sid); }
     }
     let tw = 0, t = 0; const present = [];
     for (const c of k.kats) if (cat[c.id] != null){ present.push(cat[c.id]); tw += +c.w || 0; t += cat[c.id] * (+c.w || 0); }
@@ -1189,7 +1198,7 @@
           '<small>' + fmtDate(l.datum) + (+l.gew !== 1 ? ' · ×' + num(l.gew) : '') + '<br>' + (modusOf(l) === 'note' ? 'Note' : modusOf(l) === 'sport' ? spSub(l) : 'max. ' + num(l.key.total) + ' P' + (modusOf(l) === 'aufgaben' ? ' · ' + (l.aufgaben || []).length + ' Aufg.' : '')) + '</small>' +
           (hasAusw(k, l) ? '<button type="button" class="auswbtn noprint" data-ausw="' + l.id + '" title="Auswertung nach Aufgaben">▮▮▯ Auswertung</button>' : '') + '</th>');
       }
-      h += '<th rowspan="2" class="catavg">Ø<small>' + esc(c.name) + '</small></th>';
+      h += '<th rowspan="2" class="catavg">Ø<small>' + esc(c.name) + (c.streich ? '<br>ohne schlechteste' : '') + '</small></th>';
       tagKc(h0, c);
     });
     h += '</tr><tr>';
@@ -1310,6 +1319,7 @@
     const eL = entryL();
     k.schueler.forEach(s => {
       // Arbeiten/Tests mit Punkten
+      const strk = new Set(k.kats.map(c => struckOf(k, c, s.id)).filter(Boolean));
       k.leistungen.forEach(l => {
         const sp = $('g-' + l.id + '-' + s.id); if (!sp) return;
         const x = cellVal(k, l, s.id);
@@ -1317,6 +1327,7 @@
         // Ganzes Feld in der Notenfarbe: Note groß oben, Punkte klein darunter
         const cc = x.state === 'ok' ? gradeColors(k.stufe, x.v) : null, td = sp.parentElement;
         td.classList.toggle('gfill', !!cc);
+        td.classList.toggle('struck', strk.has(l.id)); if (strk.has(l.id)) td.title = 'Gestrichen – schlechteste Leistung in „' + ((k.kats.find(c => c.id === l.kat) || {}).name || '') + '“ zählt nicht'; else td.removeAttribute('title');
         td.style.backgroundColor = cc ? cc.bg : ''; td.style.color = cc ? cc.fg : '';
         if (l.typ === 'note'){
           sp.innerHTML = ''; sp.style.display = 'none';
@@ -1669,29 +1680,31 @@
       '<div class="field"><span class="lbl">Farbe im Notenbuch</span><div class="fswatch">' + KFARBEN.map(x => '<label><input type="radio" name="cFarbe" value="' + x[0] + '"' + (x[0] === curF ? ' checked' : '') + '>' +
         '<span class="kfarb' + (x[0] === 'keine' ? ' keine' : '') + '" style="background:' + (x[2] || '#fff') + '"></span>' + x[1] + '</label>').join('') + '</div></div>' +
       '<div id="cSport"></div>' +
+      '<label class="chk" id="cStreichBox" style="margin:2px 0 12px"><input type="checkbox" id="cStreich"' + (d.streich ? ' checked' : '') + '> <span><b>Schlechteste Leistung streichen</b> – bei jeder Person zählt die schlechteste Note (z. B. die schwächste Disziplin) nicht zum Schnitt dieser Kategorie (erst ab 2 Noten).</span></label>' +
       (n ? '<div class="hint">' + n + ' Eintrag/Einträge in dieser Kategorie.</div>' : '');
     // --- Sport: Wertungstabelle zur Kategorie
     let spCfg = d.sport ? copy(d.sport) : null, spManual = !!d.sport;
     const cTyp = () => dlg.querySelector('input[name=cTyp]:checked').value;
     const renderCSport = () => {
       const box = dq('#cSport');
+      dq('#cStreichBox').style.display = cTyp() === 'note' ? 'none' : '';
       if (cTyp() !== 'sport'){ box.innerHTML = ''; return; }
       const kls = [...new Set(DB.sport.map(t => +t.kl))].sort((a, b) => a - b);
       if (!kls.length){ box.innerHTML = '<div class="keybox">Es sind noch keine Sport-Wertungstabellen hinterlegt. Importiere sie zuerst unter <b>Vorlagen … › Sport-Wertungstabellen</b>.</div>'; return; }
-      if (!spCfg || !spManual) spCfg = spGuess(k, dq('#cName').value, spCfg && spCfg.kl);
+      if (!spCfg || !spManual){ spCfg = spGuess(k, dq('#cName').value, spCfg && spCfg.kl); if (!spCfg.m && !spCfg.w && /leicht|athlet|sport|schwimm|turn|spiel|wettkampf|bundesjugend/i.test(dq('#cName').value)) spCfg.multi = true; }
       const T = spTabs(spCfg.kl), bases = [...new Set(T.map(t => spBase(t.name)))];
-      const cur = spBase(spCfg.m || spCfg.w || '');
+      const cur = spCfg.multi ? '*' : spBase(spCfg.m || spCfg.w || '');
       const opts = (g, b) => T.filter(t => t.g === g && spBase(t.name) === b).map(t => t.name);
       const sel = (id, list, val, none) => '<select id="' + id + '">' + (none ? '<option value="">' + none + '</option>' : '') + list.map(x => '<option value="' + esc(String(x)) + '"' + (String(x) === String(val) ? ' selected' : '') + '>' + esc(String(x)) + '</option>').join('') + '</select>';
       const miss = k.schueler.filter(x => x.geschlecht !== 'm' && x.geschlecht !== 'w').length;
       box.innerHTML = '<div class="keybox" style="margin-bottom:12px"><div class="grid3" style="grid-template-columns:110px 1fr"><div class="field"><label>Jahrgang</label>' + sel('csKl', kls, spCfg.kl) + '</div>' +
-        '<div class="field"><label>Wertungstabelle (Disziplin)</label>' + sel('csDis', bases, cur, '– bitte wählen –') + '</div></div>' +
-        (cur ? '<div class="grid2"><div class="field"><label>Jungen</label>' + sel('csM', opts('m', cur), spCfg.m, '– keine Tabelle –') + '</div><div class="field"><label>Mädchen</label>' + sel('csW', opts('w', cur), spCfg.w, '– keine Tabelle –') + '</div></div>' : '') +
-        '<div class="hint" style="margin:0">' + (cur ? 'Die Disziplin wurde ' + (spManual ? 'gewählt' : 'aus dem Namen erkannt') + '. ' : 'Tipp: Den Namen wie die Disziplin schreiben (z. B. „50m“, „Weitsprung“, „Kugel“, „12 min“) – dann wird die Tabelle automatisch gewählt. ') +
+        '<div class="field"><label>Wertungstabelle (Disziplin)</label>' + sel('csDis', bases, cur, '– bitte wählen –').replace('</select>', '<option value="*"' + (cur === '*' ? ' selected' : '') + '>verschiedene Disziplinen – bei jedem „+“ wählen</option></select>') + '</div></div>' +
+        (cur && cur !== '*' ? '<div class="grid2"><div class="field"><label>Jungen</label>' + sel('csM', opts('m', cur), spCfg.m, '– keine Tabelle –') + '</div><div class="field"><label>Mädchen</label>' + sel('csW', opts('w', cur), spCfg.w, '– keine Tabelle –') + '</div></div>' : '') +
+        '<div class="hint" style="margin:0">' + (cur === '*' ? 'Für Sammelkategorien wie „Leichtathletik“: Beim „+“ wählst du jedes Mal die Disziplin (z. B. Hochsprung, Weitsprung, 50 m). ' : cur ? 'Die Disziplin wurde ' + (spManual ? 'gewählt' : 'aus dem Namen erkannt') + '. ' : 'Tipp: Den Namen wie die Disziplin schreiben (z. B. „50m“, „Weitsprung“, „Kugel“, „12 min“) – dann wird die Tabelle automatisch gewählt. ') +
         (isNew ? 'Nach dem Anlegen kannst du sofort die Leistungen eintragen.' : '') + '</div>' +
         (miss ? '<div class="hint" style="color:#b45309;margin-bottom:0">Bei ' + miss + ' Schüler·innen fehlt noch m/w – das kannst du danach mit einem Klick auf „m/w?“ festlegen.</div>' : '') + '</div>';
       dq('#csKl').onchange = e => { const b = spBase(spCfg.m || spCfg.w || ''); spCfg = spGuess(k, b || dq('#cName').value, +e.target.value); renderCSport(); };
-      dq('#csDis').onchange = e => { spManual = true; const b = e.target.value; spCfg.m = (opts('m', b)[0] || ''); spCfg.w = (opts('w', b)[0] || ''); renderCSport(); };
+      dq('#csDis').onchange = e => { spManual = true; const b = e.target.value; if (b === '*'){ spCfg = {kl:spCfg.kl, multi:true, m:'', w:''}; } else { delete spCfg.multi; spCfg.m = (opts('m', b)[0] || ''); spCfg.w = (opts('w', b)[0] || ''); } renderCSport(); };
       if (dq('#csM')) dq('#csM').onchange = e => { spManual = true; spCfg.m = e.target.value; };
       if (dq('#csW')) dq('#csW').onchange = e => { spManual = true; spCfg.w = e.target.value; };
     };
@@ -1716,9 +1729,10 @@
       d.w = Math.max(0, parseFloat(String(dq('#cW').value).replace(',', '.')) || 0);
       d.typ = dlg.querySelector('input[name=cTyp]:checked').value;
       d.farbe = dlg.querySelector('input[name=cFarbe]:checked').value;
+      if (d.typ !== 'note' && dq('#cStreich').checked) d.streich = true; else delete d.streich;
       if (d.typ === 'sport'){
         if (!DB.sport.length){ alert('Bitte zuerst die Sport-Wertungstabellen importieren (Vorlagen … › Sport-Wertungstabellen).'); return false; }
-        if (!spCfg || !(spCfg.m || spCfg.w)){ alert('Für „' + d.name + '“ wurde keine passende Wertungstabelle gefunden. Bitte die Disziplin auswählen.'); return false; }
+        if (!spCfg || !(spCfg.m || spCfg.w || spCfg.multi)){ alert('Für „' + d.name + '“ wurde keine passende Wertungstabelle gefunden. Bitte die Disziplin auswählen.'); return false; }
         d.sport = copy(spCfg);
       } else delete d.sport;
       const others = k.kats.filter(x => x.id !== d.id);
@@ -1729,13 +1743,13 @@
           : d.typ === 'sport' ? 'Die ' + n + ' Einträge werden zu Sportleistungen. Eingetragene Werte werden als Zeiten bzw. Weiten gelesen. Fortfahren?'
           : 'Die ' + n + ' Einträge werden zu Arbeiten/Tests mit Punkten und Notenschlüssel. Eingetragene Werte werden als Punkte gelesen. Fortfahren?')) return false;
         convertKat(k, c, d.typ, d.sport);
-      } else if (!isNew && d.typ === 'sport'){   // geänderte Tabelle gilt für alle Spalten der Kategorie
+      } else if (!isNew && d.typ === 'sport' && !d.sport.multi){   // geänderte Tabelle gilt für alle Spalten der Kategorie
         k.leistungen.filter(l => l.kat === c.id && l.modus === 'sport').forEach(l => { l.sport = copy(d.sport); });
       }
-      if (!isNew) delete c.sport;
+      if (!isNew){ delete c.sport; delete c.streich; }
       if (isNew) k.kats.push(d); else Object.assign(c, d);
       saveDB(); renderBuch();
-      if (isNew && d.typ === 'sport') setTimeout(() => addSportEntry(k, d), 0);
+      if (isNew && d.typ === 'sport') setTimeout(() => d.sport.multi ? openLeistung(k, null, null, d.id) : addSportEntry(k, d), 0);
     }});
     openDialog(isNew ? 'Neue Kategorie – ' + k.name : 'Kategorie bearbeiten', html, buttons);
     upd(); renderCSport();
@@ -2158,7 +2172,8 @@
     const d = l ? copy(l) : {id:uid(), name:defName(startKat), datum:today(), kat:startKat.id, gew:1,
       modus: presetAufg ? 'aufgaben' : presetWerte ? 'gesamt' : (presetKey ? 'gesamt' : 'gesamt'),
       typ:'punkte', key: presetKey || copy(S[k.stufe]), werte: presetWerte ? copy(presetWerte) : {}};
-    if (isNew && isSportKat(startKat)){ d.modus = 'sport'; d.typ = 'sport'; d.sport = copy(startKat.sport || spGuess(k, startKat.name)); d.name = startKat.name; }
+    if (isNew && isSportKat(startKat)){ d.modus = 'sport'; d.typ = 'sport'; const cs = startKat.sport || spGuess(k, startKat.name);
+      d.sport = cs.multi ? {kl:cs.kl, m:'', w:''} : copy(cs); if (!cs.multi) d.name = startKat.name; }
     d.modus = modusOf(d);
     if (!d.key) d.key = copy(S[k.stufe]);
     if (presetAufg){ d.aufgaben = copy(presetAufg.tasks); d.ap = copy(presetAufg.ap || {}); }
@@ -3001,7 +3016,7 @@
       if (a === 'leistung'){
         const pc = k.kats.find(c => katTyp(c) === 'punkte');
         const sc = k.kats.find(c => isSportKat(c));
-        if (pc) openLeistung(k, null, null, pc.id); else if (sc) addSportEntry(k, sc); else openNummerWahl(k, k.kats[0]);
+        if (pc) openLeistung(k, null, null, pc.id); else if (sc) (sc.sport && sc.sport.multi ? openLeistung(k, null, null, sc.id) : addSportEntry(k, sc)); else openNummerWahl(k, k.kats[0]);
       }
       else if (a === 'kategorie') openKategorie(k, null);
       else if (a === 'schueler') openAddSchueler(k);
@@ -3016,7 +3031,7 @@
     const add = e.target.closest('[data-addkat]');
     if (add && k){
       const c = k.kats.find(x => x.id === add.dataset.addkat);
-      return isNoteKat(c) ? openNummerWahl(k, c) : isSportKat(c) ? addSportEntry(k, c) : openLeistung(k, null, null, c.id);
+      return isNoteKat(c) ? openNummerWahl(k, c) : isSportKat(c) ? (c.sport && c.sport.multi ? openLeistung(k, null, null, c.id) : addSportEntry(k, c)) : openLeistung(k, null, null, c.id);
     }
     const cth = e.target.closest('th[data-kat]');
     if (cth && k) return openKategorie(k, k.kats.find(c => c.id === cth.dataset.kat));
