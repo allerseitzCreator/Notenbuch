@@ -303,6 +303,7 @@
   .aw-tab td.has{font-weight:700;background:var(--accent-soft)}
   .aw-tab td.na-c{background:repeating-linear-gradient(45deg,#f4f5f7 0 4px,#fff 4px 8px)}
   .side li .kn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .side li .kn .kf{margin-left:6px;font-size:12px;font-weight:400;color:var(--muted)}
   .side li .liact{display:none;gap:2px;margin-left:2px}
   .side li.active .liact,.side li:hover .liact{display:inline-flex}
   .side li.active .badge,.side li:hover .badge{display:none}
@@ -900,7 +901,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '27';
+  const APP_VERSION = '28';
   /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
   const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
   const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
@@ -949,6 +950,9 @@
   const spSub = l => { const sp = l.sport || {}; return 'Kl. ' + (sp.kl || '?') + ' · ' + (spFind(sp.kl, 'm', sp.m) || spFind(sp.kl, 'w', sp.w) ? (spIsZeit(spFind(sp.kl, 'm', sp.m) || spFind(sp.kl, 'w', sp.w)) ? 'Zeit (s)' : 'Meter') : 'keine Tabelle'); };   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
   const katTyp = c => c && c.typ === 'note' ? 'note' : c && c.typ === 'sport' ? 'sport' : 'punkte';
   const isSportKat = c => katTyp(c) === 'sport';
+  const FAECHER = ['Deutsch','Englisch','Französisch','Latein','Spanisch','Italienisch','Griechisch','Mathematik','Physik','Chemie','Biologie','NwT','BNT','Informatik','Geschichte','Geographie','Gemeinschaftskunde','Wirtschaft','WBS','Ethik','Ev. Religion','Kath. Religion','Kunst','Musik','Sport','Philosophie','Psychologie'];
+  // Klassenname mit Fach (ohne Doppelung, falls das Fach schon im Namen steht)
+  const klName = k => k.fach && !String(k.name).toLowerCase().includes(String(k.fach).toLowerCase()) ? k.name + ' · ' + k.fach : k.name;
   // Farbcodierung der Kategorien (bewusst ohne Grün/Gelb/Rot, damit sie nicht mit den Notenfarben verwechselt wird)
   const KFARBEN = [['blau','Blau','#3f6ccc'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
   const katFarbe = (kats, c) => { const f = c && c.farbe; if (f && KFARBEN.some(x => x[0] === f)) return f; const i = Math.max(0, kats.indexOf(c)); return KFARBEN[i % 6][0]; };
@@ -1108,7 +1112,7 @@
   function renderBuch(){
     { const k0 = aktKlasse && aktKlasse(); if (k0) k0.kats.forEach(c => { if (isSportKat(c) && !c.sport) c.sport = spGuess(k0, c.name); }); }
     $('klassenListe').innerHTML = DB.klassen.length
-      ? DB.klassen.map(k => '<li data-kid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span class="kn">' + esc(k.name) + '</span>' + badge(k.stufe) +
+      ? DB.klassen.map(k => '<li data-kid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span class="kn">' + esc(k.name) + (k.fach && !k.name.toLowerCase().includes(k.fach.toLowerCase()) ? '<small class="kf">' + esc(k.fach) + '</small>' : '') + '</span>' + badge(k.stufe) +
           '<span class="liact"><button type="button" data-kset="' + k.id + '" title="Einstellungen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button><button type="button" class="del" data-kdel2="' + k.id + '" title="Klasse löschen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></svg></button></span></li>').join('')
       : '<li class="empty">Noch keine Klassen angelegt.</li>';
 
@@ -1127,7 +1131,7 @@
     const eL = entryL();
     let h = needsBackup() ? '<div class="backupbar noprint"><span>⚠ Ungesicherte Änderungen – letzte Sicherung: <b>' + agoText(SY.meta.savedAt) + '</b></span><button type="button" class="btn primary" data-act="sichern">Jetzt sichern</button></div>' : '';
     if (SY.mode === 'nas' && syncState.err) h += '<div class="backupbar noprint" style="background:var(--bad-bg);color:var(--bad);border-color:#f3c2bd"><span>⚠ NAS-Synchronisierung: ' + esc(syncState.err) + '</span><button type="button" class="btn" data-act="syncset">Einstellungen</button></div>';
-    h += '<div class="buchhead"><div><h2>' + esc(k.name) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
+    h += '<div class="buchhead"><div><h2>' + esc(klName(k)) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
       k.schueler.length + ' Schüler·innen · Gewichtung ' +
       k.kats.map(c => esc(c.name)).join(' : ') + ' = ' + ratioText(k.kats) +
       (k.kats.length > 1 ? ' (' + k.kats.map(c => num(wPct(k.kats, c), 1) + ' %').join(' / ') + ')' : '') + '</div></div>' +
@@ -1379,8 +1383,8 @@
   function openKlasse(k, tpl){
     const isTpl = !!tpl;
     const isNew = !k;
-    const d = isTpl ? {name:tpl.name || '', stufe:tpl.stufe || 'mittel', kats:(tpl.kats || defKats('mittel')).map(c => Object.assign({}, c, {id:uid()}))}
-      : k ? {name:k.name, stufe:k.stufe, kats:copy(k.kats)} : {name:'', stufe:'mittel', kats:defKats('mittel')};
+    const d = isTpl ? {name:tpl.name || '', fach:tpl.fach || '', stufe:tpl.stufe || 'mittel', kats:(tpl.kats || defKats('mittel')).map(c => Object.assign({}, c, {id:uid()}))}
+      : k ? {name:k.name, fach:k.fach || '', stufe:k.stufe, kats:copy(k.kats)} : {name:'', fach:'', stufe:'mittel', kats:defKats('mittel')};
     const locked = !!(k && k.leistungen.length);
     const used = new Set(k ? k.leistungen.map(l => l.kat) : []);
     const html =
@@ -1389,7 +1393,9 @@
           ? '<select id="kTpl"><option value="">– Vorlage wählen –</option>' + DB.vorlagen.map(v => '<option value="' + v.id + '">' + esc(v.name) + ' (' + stufeName(v.stufe) + ')</option>').join('') + '</select>' +
             '<div class="hint">Übernimmt Stufe, Kategorien und Gewichtung. Die Vorlage selbst bleibt unverändert.</div>'
           : '<div class="hint" style="margin:0">Noch keine Vorlagen – Einstellungen unten vornehmen und mit „Als Vorlage speichern …“ sichern.</div>') + '</div>' : '') +
-      '<div class="field"><label>' + (isTpl ? 'Name der Vorlage' : 'Name') + '</label><input type="text" id="kName" value="' + esc(d.name) + '" placeholder="' + (isTpl ? 'z. B. Englisch Unterstufe' : 'z. B. 7a Mathematik oder M1 (Kursstufe)') + '"></div>' +
+      '<div class="grid2" style="grid-template-columns:1.3fr 1fr"><div class="field"><label>' + (isTpl ? 'Name der Vorlage' : 'Name') + '</label><input type="text" id="kName" value="' + esc(d.name) + '" placeholder="' + (isTpl ? 'z. B. Englisch Unterstufe' : 'z. B. 7a oder M1 (Kursstufe)') + '"></div>' +
+      '<div class="field"><label>Fach</label><input type="text" id="kFach" list="faecherListe" value="' + esc(d.fach || '') + '" placeholder="z. B. Englisch" autocomplete="off">' +
+      '<datalist id="faecherListe">' + [...new Set(FAECHER.concat(DB.klassen.map(x => x.fach).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'de')).map(f => '<option value="' + esc(f) + '">').join('') + '</datalist></div></div>' +
       '<div class="field"><span class="lbl">Stufe</span><div class="seg">' +
       '<label><input type="radio" name="kStufe" value="mittel" ' + (d.stufe === 'mittel' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Mittelstufe (1–6)</label>' +
       '<label><input type="radio" name="kStufe" value="kurs" ' + (d.stufe === 'kurs' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Kursstufe (0–15 VP)</label></div>' +
@@ -1433,7 +1439,7 @@
       vals.forEach((v, i) => d.kats[i].w = v);
       renderKats(true);
     };
-    const readAll = () => { readKats(); const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value; d.name = dq('#kName').value.trim(); };
+    const readAll = () => { readKats(); const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value; d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); };
     const buttons = [];
     if (isTpl){
       if (tpl.id) buttons.push({label:'Vorlage löschen', cls:'danger', onClick:() => {
@@ -1449,7 +1455,7 @@
         const same = DB.vorlagen.find(x => x.name.toLowerCase() === d.name.toLowerCase() && x.id !== tpl.id);
         if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Überschreiben?')) return false;
         if (same) DB.vorlagen = DB.vorlagen.filter(x => x !== same);
-        saveAsTemplate(d.name, d.stufe, kats, tpl.id); setTimeout(openVorlagen, 0);
+        saveAsTemplate(d.name, d.stufe, kats, tpl.id, d.fach); setTimeout(openVorlagen, 0);
       }});
     } else {
     if (!isNew) buttons.push({label:'Klasse löschen', cls:'danger', onClick:() => { if (!deleteKlasse(k)) return false; }});
@@ -1460,7 +1466,7 @@
       const name = (prompt('Name der Vorlage (z. B. „Englisch Unterstufe“):', '') || '').trim(); if (!name) return false;
       const same = DB.vorlagen.find(x => x.name.toLowerCase() === name.toLowerCase());
       if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Mit diesen Einstellungen überschreiben?')) return false;
-      saveAsTemplate(name, d.stufe, kats, same ? same.id : null);
+      saveAsTemplate(name, d.stufe, kats, same ? same.id : null, d.fach);
       const sel = dq('#kTpl');
       const box = dlg.querySelector('.tplload');
       if (box) box.innerHTML = '<label for="kTpl">Vorlage laden</label><select id="kTpl"><option value="">– Vorlage wählen –</option>' + DB.vorlagen.map(v => '<option value="' + v.id + '">' + esc(v.name) + ' (' + stufeName(v.stufe) + ')</option>').join('') + '</select><div class="hint" style="color:#2e9e4f">✓ Vorlage „' + esc(name) + '“ gespeichert.</div>';
@@ -1470,17 +1476,17 @@
     buttons.push({label:'Abbrechen'});
     buttons.push({label: isNew ? 'Anlegen' : 'Speichern', cls:'primary', onClick:() => {
       readKats();
-      d.name = dq('#kName').value.trim();
+      d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim();
       if (!d.name){ dq('#kName').classList.add('invalid'); dq('#kName').focus(); return false; }
       d.kats = d.kats.filter(c => c.name);
       if (d.kats.length && !d.kats.some(c => +c.w > 0)){ alert('Mindestens eine Kategorie braucht ein Gewicht größer als 0.'); return false; }
       if (!d.kats.length){ alert('Mindestens eine Kategorie ist nötig.'); d.kats = defKats(d.stufe); renderKats(); return false; }
       const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value;
       if (isNew){
-        const nk = {id:uid(), name:d.name, stufe:d.stufe, kats:d.kats, schueler:[], leistungen:[]};
+        const nk = {id:uid(), name:d.name, stufe:d.stufe, kats:d.kats, schueler:[], leistungen:[]}; if (d.fach) nk.fach = d.fach;
         DB.klassen.push(nk); DB.aktiv = nk.id;
       } else {
-        k.name = d.name; if (!locked) k.stufe = d.stufe; k.kats = d.kats;
+        k.name = d.name; if (d.fach) k.fach = d.fach; else delete k.fach; if (!locked) k.stufe = d.stufe; k.kats = d.kats;
         const ids = new Set(k.kats.map(c => c.id));
         k.leistungen.forEach(l => { if (!ids.has(l.kat)) l.kat = k.kats[0].id; });
       }
@@ -1502,6 +1508,7 @@
         kept.forEach(o => nk.push(Object.assign({}, o)));
         d.kats = nk;
         if (!locked){ d.stufe = v.stufe; dlg.querySelectorAll('input[name=kStufe]').forEach(r => r.checked = r.value === v.stufe); }
+        if (v.fach && !dq('#kFach').value.trim()) dq('#kFach').value = v.fach;
         renderKats();
         const hint = sel.parentNode.querySelector('.hint');
         if (hint) hint.innerHTML = '✓ Vorlage „' + esc(v.name) + '“ geladen' + (kept.length ? ' – beibehalten, weil schon Noten darin stehen: ' + kept.map(o => esc(o.name)).join(', ') : '') + '. Die Vorlage selbst bleibt unverändert.';
@@ -1965,8 +1972,8 @@
 
   /* ---------- Vorlagen für Kategorien & Gewichtung ---------- */
   const tplSummary = v => v.kats.map(c => (katFarbe(v.kats, c) !== 'keine' ? '<span class="ckey" style="background:' + farbHex(katFarbe(v.kats, c)) + '"></span>' : '') + esc(c.name) + ' ' + num(wPct(v.kats, c), 0) + ' %').join(' · ');
-  function saveAsTemplate(name, stufe, kats, replaceId){
-    const t = {id: replaceId || uid(), name, stufe, kats: kats.map(c => ({name:c.name, w:+c.w || 0, typ:katTyp(c), farbe:katFarbe(kats, c)}))};
+  function saveAsTemplate(name, stufe, kats, replaceId, fach){
+    const t = {id: replaceId || uid(), name, stufe, fach: fach || '', kats: kats.map(c => ({name:c.name, w:+c.w || 0, typ:katTyp(c), farbe:katFarbe(kats, c)}))};
     const i = DB.vorlagen.findIndex(x => x.id === t.id);
     if (i >= 0) DB.vorlagen[i] = t; else DB.vorlagen.push(t);
     DB.vorlagen.sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -1974,7 +1981,7 @@
   }
   function openVorlagen(){
     const list = DB.vorlagen.length
-      ? '<div class="tlist">' + DB.vorlagen.map(v => '<div class="trow"><span style="flex:1"><b>' + esc(v.name) + '</b> ' + badge(v.stufe) +
+      ? '<div class="tlist">' + DB.vorlagen.map(v => '<div class="trow"><span style="flex:1"><b>' + esc(v.name) + '</b> ' + (v.fach ? '<span class="hint" style="margin:0">· ' + esc(v.fach) + '</span> ' : '') + badge(v.stufe) +
           '<br><small class="hint" style="margin:0">' + tplSummary(v) + '</small></span>' +
           '<button type="button" class="btn" data-tedit="' + v.id + '">Bearbeiten</button>' +
           '<button type="button" class="btn" data-tcopy="' + v.id + '" title="Kopie anlegen">Kopie</button>' +
@@ -1986,7 +1993,7 @@
     dlg.querySelector('.dlgbody').addEventListener('click', e => {
       const ed = e.target.closest('[data-tedit]'), cp = e.target.closest('[data-tcopy]'), del = e.target.closest('[data-tdel]');
       if (ed){ const v = DB.vorlagen.find(x => x.id === ed.dataset.tedit); dlg.close(); openKlasse(null, v); }
-      else if (cp){ const v = DB.vorlagen.find(x => x.id === cp.dataset.tcopy); saveAsTemplate(v.name + ' (Kopie)', v.stufe, v.kats); dlg.close(); openVorlagen(); }
+      else if (cp){ const v = DB.vorlagen.find(x => x.id === cp.dataset.tcopy); saveAsTemplate(v.name + ' (Kopie)', v.stufe, v.kats, null, v.fach); dlg.close(); openVorlagen(); }
       else if (del){ const v = DB.vorlagen.find(x => x.id === del.dataset.tdel); if (confirm('Vorlage „' + v.name + '“ löschen? Bestehende Klassen bleiben unverändert.')){ DB.vorlagen = DB.vorlagen.filter(x => x !== v); saveDB(); dlg.close(); openVorlagen(); } }
     });
   }
@@ -2430,7 +2437,7 @@
     const bar = n => '█'.repeat(Math.max(0, Math.round(n)));
     const pct = (n, of) => of ? num(n / of * 100, 1) : '';
     const gName = D.kurs ? 'VP' : 'Note';
-    row(['Auswertung', l.name]); row(['Klasse', k.name]); row(['Datum', fmtDate(l.datum)]);
+    row(['Auswertung', l.name]); row(['Klasse', k.name]); if (k.fach) row(['Fach', k.fach]); row(['Datum', fmtDate(l.datum)]);
     row(['Art der Eintragung', MODI[D.modus].t]);
     if (D.pts){ row(['Notenschlüssel', keySummary(k.stufe, l.key)]); row(['Gesamtpunktzahl', num(D.R.total)]); }
     blank();
@@ -2610,7 +2617,7 @@
     const section = t => { P.text(0, y + 10, t, 10, {bold:true}); y += 16; };
     // Kopf
     P.text(0, y + 16, 'Auswertung: ' + l.name, 16, {bold:true}); y += 22;
-    const meta = k.name + ' · ' + stufeName(k.stufe) + (l.datum ? ' · ' + fmtDate(l.datum) : '') + ' · ' + MODI[D.modus].t + (D.pts ? ' · Notenschlüssel: ' + keySummary(k.stufe, l.key) : '');
+    const meta = klName(k) + ' · ' + stufeName(k.stufe) + (l.datum ? ' · ' + fmtDate(l.datum) : '') + ' · ' + MODI[D.modus].t + (D.pts ? ' · Notenschlüssel: ' + keySummary(k.stufe, l.key) : '');
     P.wrap(meta, 7.5, W, false).forEach(t => { P.text(0, y + 8, t, 7.5, {color:MUT}); y += 10; }); y += 6;
     // Kacheln + Notenbild
     const tw = 86, gap = 8, HH = 92;
@@ -2759,7 +2766,7 @@
       .pill{display:inline-block;min-width:30px;padding:1px 6px;border-radius:6px;font-weight:700}
       .foot{margin-top:10px;color:var(--muted);font-size:10px;text-align:right}`;
     const pill = (v, label) => { const c = gradeColors(k.stufe, v); return '<span class="pill" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(label) + '</span>'; };
-    let h = '<div id="page"><h1>Auswertung: ' + esc(l.name) + '</h1><div class="meta">' + esc(k.name) + ' · ' + stufeName(k.stufe) +
+    let h = '<div id="page"><h1>Auswertung: ' + esc(l.name) + '</h1><div class="meta">' + esc(klName(k)) + ' · ' + stufeName(k.stufe) +
       (l.datum ? ' · ' + fmtDate(l.datum) : '') + ' · ' + MODI[D.modus].t + (D.pts ? ' · Notenschlüssel: ' + esc(keySummary(k.stufe, l.key)) : '') + '</div>';
     h += '<div class="head"><div class="tile"><small>Ausgewertet</small><b>' + D.ok.length + '</b><span>von ' + k.schueler.length + '</span></div>' +
       '<div class="tile"><small>Ø ' + gname + '</small><b>' + (D.avgG != null ? num(D.avgG, 2) : '–') + '</b><span>unter ' + (kurs ? '05 VP' : '4') + ': ' + D.under + '</span></div>' +
@@ -2843,7 +2850,7 @@
     btns.push({label:'Schließen', cls:'primary'});
     h += '<div class="aw-einzel"><span>Herunterladen, Drucken &amp; CSV:</span><div class="seg"><label><input type="radio" name="awEinzel" value="1"' + (auswEinzel ? ' checked' : '') + '>mit Einzelergebnissen</label>' +
       '<label><input type="radio" name="awEinzel" value="0"' + (auswEinzel ? '' : ' checked') + '>ohne Einzelergebnisse</label></div><span class="hint" style="margin:0">ohne = keine Namen und Einzelnoten, nur die Klassenübersicht</span></div>';
-    openDialog('Auswertung – ' + l.name + ' · ' + k.name, h, btns, true);
+    openDialog('Auswertung – ' + l.name + ' · ' + klName(k), h, btns, true);
     dlg.querySelectorAll('input[name=awEinzel]').forEach(r => r.addEventListener('change', () => { auswEinzel = r.value === '1'; try { localStorage.setItem('notenbuch-auswEinzel', auswEinzel ? '1' : '0'); } catch (e) {} }));
     dlg.classList.add('xwide');
     if (D.per.length){
@@ -3440,7 +3447,7 @@
     if (!k){ main.innerHTML = '<div class="emptystate"><h2>Sitzplan</h2><p>Links eine Klasse auswählen.</p></div>'; return; }
     const sp = sitzOf(k);
     const placed = k.schueler.filter(s => sp.pos[s.id]), free = k.schueler.filter(s => !sp.pos[s.id]);
-    let h = '<div class="sitzhead noprint"><div><h2 style="margin:0">Sitzplan ' + esc(k.name) + '</h2><div class="summary" style="margin:2px 0 0">' + placed.length + ' von ' + k.schueler.length + ' platziert · Namen auf den Plan ziehen, Foto-Symbol antippen für ein Foto</div></div>' +
+    let h = '<div class="sitzhead noprint"><div><h2 style="margin:0">Sitzplan ' + esc(klName(k)) + '</h2><div class="summary" style="margin:2px 0 0">' + placed.length + ' von ' + k.schueler.length + ' platziert · Namen auf den Plan ziehen, Foto-Symbol antippen für ein Foto</div></div>' +
       '<div class="toolbar"><label class="chk" style="margin:0 6px 0 0"><input type="checkbox" id="spRaster"' + (sp.raster ? ' checked' : '') + '> am Raster ausrichten</label>' +
       '<button class="btn" type="button" data-sp="auto">Automatisch anordnen</button>' +
       '<button class="btn" type="button" data-sp="clear">Alle zurücklegen</button>' +
