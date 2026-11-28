@@ -189,6 +189,11 @@
   .gseg{flex:none;gap:4px}
   .gseg label{min-width:38px;flex:none;padding:4px 8px}
   table.gb tr td.pc.struck{background-image:linear-gradient(to top right,transparent calc(50% - 1px),rgba(30,35,45,.55) calc(50% - 1px),rgba(30,35,45,.45) calc(50% + 1px),transparent calc(50% + 1px))!important;opacity:.7}
+  table.gb [data-zu]{display:none}
+  table.gb [data-zuavg]{border-left:2px solid var(--kb, #c9d3ea)}
+  table.gb th.cat .catzu{border:1px solid var(--line);background:#fff;border-radius:5px;width:20px;height:20px;line-height:16px;padding:0;margin-right:6px;font-size:11px;color:var(--muted);cursor:pointer;vertical-align:1px}
+  table.gb th.cat .catzu:hover{color:var(--accent);border-color:var(--accent)}
+  table.gb th.cat .czn{display:inline-block;margin-left:5px;font-size:10px;font-weight:700;background:var(--kb, var(--accent));color:#fff;border-radius:999px;padding:0 6px;line-height:15px;letter-spacing:0}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
   .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
   .emptystate h2{color:var(--ink)}
@@ -918,7 +923,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '32';
+  const APP_VERSION = '33';
   /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
   const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
   const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
@@ -1169,6 +1174,11 @@
      Notenbuch – Darstellung
      ============================================================ */
   let solo = null;   // Einzelansicht {kid, sid}, nur für diese Sitzung
+  // Ein-/Ausklappen von Kategorien – Ansichtseinstellung nur auf diesem Gerät
+  let ZUMAP = {}; try { ZUMAP = JSON.parse(localStorage.getItem('notenbuch-zu') || '{}') || {}; } catch (e) { ZUMAP = {}; }
+  const zuGet = id => !!ZUMAP[id];
+  const zuToggle = id => { if (ZUMAP[id]) delete ZUMAP[id]; else ZUMAP[id] = 1; try { localStorage.setItem('notenbuch-zu', JSON.stringify(ZUMAP)); } catch (e) {} };
+  const catCount = (k, c) => k.leistungen.filter(l => l.kat === c.id).length;
   function repairSport29(){
     DB.meta = DB.meta || {};
     if (DB.meta.fixSport29 || !(DB.sport || []).length) return;
@@ -1243,11 +1253,24 @@
     const KC = {};
     k.kats.forEach(c => { const f = katFarbe(k.kats, c); if (f !== 'keine') KC[c.id] = f; });
     // Alle Zellen einer Kategorie bekommen data-kc → Tönung über CSS-Variablen
-    const tagKc = (from, c) => { if (!KC[c.id]) return; h = h.slice(0, from) + h.slice(from).replace(/<(t[hd])([ >])/g, '<$1 data-kc="' + KC[c.id] + '"$2'); };
+    // eingeklappte Kategorien: nur Überschrift und Ø-Spalte bleiben sichtbar
+    const ZU = {}; k.kats.forEach(c => { if (zuGet(c.id) && catCount(k, c) > 0) ZU[c.id] = true; });
+    const tagKc = (from, c) => {
+      let seg = h.slice(from);
+      if (KC[c.id]) seg = seg.replace(/<(t[hd])([ >])/g, '<$1 data-kc="' + KC[c.id] + '"$2');
+      if (ZU[c.id]) seg = seg.replace(/<(t[hd])(\s[^>]*)?>/g, (m, tag, at) => {
+        at = at || '';
+        if (/class="[^"]*\bcat\b/.test(at)) return '<' + tag + at.replace(/colspan="\d+"/, 'colspan="1"') + '>';
+        if (/class="[^"]*\bcatavg\b/.test(at)) return '<' + tag + at + ' data-zuavg>';
+        return '<' + tag + ' data-zu' + at + '>';
+      });
+      h = h.slice(0, from) + seg;
+    };
     h = h.replace('<div class="tablewrap">', '<style>' + KFARBEN.filter(x => x[2]).map(x => 'table.gb [data-kc="' + x[0] + '"]{--kb:' + x[2] + ';--kt:' + rgba(x[2], .055) + ';--kh:' + rgba(x[2], .12) + ';--kH:' + rgba(x[2], .2) + '}').join('') + '</style><div class="tablewrap">');
     k.kats.forEach(c => { const h0 = h.length;
       h += '<th colspan="' + (width(c) + 1) + '" class="cat catstart" data-kat="' + c.id + '" title="Kategorie bearbeiten">' +
-        '<span class="cn">' + esc(c.name) + '</span><span class="cw">' + num(wPct(k.kats, c), 1) + ' %</span>' +
+        (catCount(k, c) > 0 ? '<button type="button" class="catzu noprint" data-zutoggle="' + c.id + '" title="' + (zuGet(c.id) ? 'Ausklappen: alle ' + catCount(k, c) + ' Einträge zeigen' : 'Einklappen: nur den Schnitt zeigen') + '">' + (zuGet(c.id) ? '▸' : '▾') + '</button>' : '') +
+        '<span class="cn">' + esc(c.name) + '</span>' + (zuGet(c.id) && catCount(k, c) > 0 ? '<span class="czn">' + catCount(k, c) + '</span>' : '') + '<span class="cw">' + num(wPct(k.kats, c), 1) + ' %</span>' +
         '<button type="button" class="catadd noprint" data-addkat="' + c.id + '" title="' + (isNoteKat(c) ? 'Neue Nummer / neue Noten' : isSportKat(c) ? 'Neuer Termin (weitere Spalte)' : 'Neue Arbeit / neuer Test') + '">+</button></th>';
       tagKc(h0, c);
     });
@@ -3134,6 +3157,8 @@
     }
     const aw = e.target.closest('[data-ausw]');
     if (aw && k){ const l = k.leistungen.find(x => x.id === aw.dataset.ausw); if (l) return openAuswertung(k, l); }
+    const zt = e.target.closest('[data-zutoggle]');
+    if (zt && k){ zuToggle(zt.dataset.zutoggle); renderBuch(); return; }
     const add = e.target.closest('[data-addkat]');
     if (add && k){
       const c = k.kats.find(x => x.id === add.dataset.addkat);
