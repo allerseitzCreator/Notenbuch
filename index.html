@@ -160,6 +160,18 @@
   #updBar{position:fixed;left:12px;right:12px;margin:0 auto;width:fit-content;bottom:18px;z-index:100;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#fff;border:1px solid #c9d3ea;box-shadow:0 10px 30px rgba(20,30,60,.22);border-radius:12px;padding:10px 14px;font-size:14px;max-width:calc(100vw - 24px)}
   .aw-einzel .seg label{flex:none;white-space:nowrap;padding:7px 12px}
   .aw-einzel{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px;padding:10px 12px;background:#f6f8fc;border:1px solid var(--line);border-radius:10px;font-size:13px}
+  table.gb td.pc .spwarn{display:inline-block;font-size:11px;font-weight:700;color:#b45309;background:#fff4e5;border:1px solid #f5c27a;border-radius:6px;padding:1px 5px;margin-bottom:2px;cursor:pointer}
+  .spprev{margin-top:10px}
+  .spkl{padding:8px 0;border-bottom:1px solid var(--line)}
+  .spkl > div{margin-top:4px}
+  .spchip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;margin:3px 4px 0 0;font-size:12.5px;cursor:pointer}
+  .spchip:hover,.spchip.on{border-color:var(--accent);background:var(--accent-soft)}
+  .glist{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 18px}
+  .grow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .grow .gnr{width:22px;color:var(--muted);font-size:12px;text-align:right}
+  .grow .gname{flex:1;font-size:14px}
+  .gseg{flex:none;gap:4px}
+  .gseg label{min-width:38px;flex:none;padding:4px 8px}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
   .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
   .emptystate h2{color:var(--ink)}
@@ -849,6 +861,7 @@
   try { DB = LOCK ? null : JSON.parse(localStorage.getItem('notenbuch-v1')); } catch(e) { DB = null; }
   if (!DB || !Array.isArray(DB.klassen)) DB = {klassen:[], aktiv:null, view:'buch'};
   if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
+  if (!Array.isArray(DB.sport)) DB.sport = [];
   const saveDB = () => { trackChange(); if (LOCK){ if (DEK) persistEnc(); return; } try { localStorage.setItem('notenbuch-v1', JSON.stringify(DB)); } catch(e){ alert('Speichern im Browser nicht möglich – bitte Sicherung herunterladen.'); } };
   const aktKlasse = () => DB.klassen.find(k => k.id === DB.aktiv) || null;
 
@@ -887,7 +900,33 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '25';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
+  const APP_VERSION = '26';
+  /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
+  const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
+  const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
+  const spTabs = kl => (DB.sport || []).filter(t => +t.kl === +kl);
+  const spFind = (kl, g, name) => (DB.sport || []).find(t => +t.kl === +kl && t.g === g && t.name === name);
+  const spIsZeit = t => t.einheit === 's';
+  const spKlasseGuess = k => { const m = /(\d{1,2})/.exec(k.name || ''); return m ? +m[1] : null; };
+  const normG = v => { v = String(v || '').trim().toLowerCase();
+    if (/^(m|j|männlich|maennlich|junge|jungen|schüler|schueler|male|boy)$/.test(v)) return 'm';
+    if (/^(w|f|weiblich|mädchen|maedchen|schülerin|schuelerin|schülerinnen|female|girl)$/.test(v)) return 'w';
+    return ''; };
+  // Leistung lesen: „13,4“, „13.4 s“, „1:32,5“ (min:s), „4,35 m“, „2550“
+  function spParse(raw){
+    let x = String(raw).trim().toLowerCase().replace(/\s+/g, '').replace(/(sek|sec|min|s|m)$/, '');
+    const mm = /^(\d+):(\d{1,2}([.,]\d+)?)$/.exec(x);
+    if (mm) return +mm[1] * 60 + parseFloat(mm[2].replace(',', '.'));
+    if (!/^\d+([.,]\d+)?$/.test(x)) return null;
+    return parseFloat(x.replace(',', '.'));
+  }
+  // beste Stufe, deren Grenzwert erreicht ist; schlechter als 6+ → 6
+  function spGrade(t, x){
+    const z = spIsZeit(t);
+    for (let i = 0; i < SP_STUF.length; i++){ const th = +t.w[i]; if (z ? x <= th + 1e-9 : x >= th - 1e-9) return 1 + i * 0.25; }
+    return 6;
+  }
+  const spSub = l => { const sp = l.sport || {}; return 'Kl. ' + (sp.kl || '?') + ' · ' + (spFind(sp.kl, 'm', sp.m) || spFind(sp.kl, 'w', sp.w) ? (spIsZeit(spFind(sp.kl, 'm', sp.m) || spFind(sp.kl, 'w', sp.w)) ? 'Zeit (s)' : 'Meter') : 'keine Tabelle'); };   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
   const katTyp = c => c && c.typ === 'note' ? 'note' : 'punkte';
   // Farbcodierung der Kategorien (bewusst ohne Grün/Gelb/Rot, damit sie nicht mit den Notenfarben verwechselt wird)
   const KFARBEN = [['blau','Blau','#3f6ccc'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
@@ -949,6 +988,15 @@
     const s = String(l.werte[sid] ?? '').trim().replace(/\s+/g, '');
     if (s === '') return {state:'empty'};
     if (/^(-|–|x|f|fehlt|a|att|attest)$/i.test(s)) return {state:'skip'};
+    if (l.modus === 'sport'){
+      const st = k.schueler.find(x => x.id === sid), g = st && st.geschlecht;
+      if (g !== 'm' && g !== 'w') return {state:'nog'};
+      const t = l.sport && spFind(l.sport.kl, g, l.sport[g]);
+      if (!t) return {state:'notab'};
+      const x = spParse(s); if (x == null) return {state:'bad'};
+      const v = spGrade(t, x);
+      return {state:'ok', v, label:gradeLabel(k.stufe, v), perf:x};
+    }
     if (l.typ === 'punkte'){
       const R = getR(l, k.stufe);
       if (!/^\d+([.,]\d+)?$/.test(s)) return {state:'bad'};
@@ -1111,7 +1159,7 @@
         const L = byKat(c);
         if (!L.length) h += '<th rowspan="2" class="emptycat catstart">noch keine Einträge – „+“ klicken</th>';
         L.forEach((l, i) => h += '<th rowspan="2" class="lh' + (i === 0 ? ' catstart' : '') + '" data-lid="' + l.id + '" title="Eintrag bearbeiten">' + esc(l.name) +
-          '<small>' + fmtDate(l.datum) + (+l.gew !== 1 ? ' · ×' + num(l.gew) : '') + '<br>' + (modusOf(l) === 'note' ? 'Note' : 'max. ' + num(l.key.total) + ' P' + (modusOf(l) === 'aufgaben' ? ' · ' + (l.aufgaben || []).length + ' Aufg.' : '')) + '</small>' +
+          '<small>' + fmtDate(l.datum) + (+l.gew !== 1 ? ' · ×' + num(l.gew) : '') + '<br>' + (modusOf(l) === 'note' ? 'Note' : modusOf(l) === 'sport' ? spSub(l) : 'max. ' + num(l.key.total) + ' P' + (modusOf(l) === 'aufgaben' ? ' · ' + (l.aufgaben || []).length + ' Aufg.' : '')) + '</small>' +
           (hasAusw(k, l) ? '<button type="button" class="auswbtn noprint" data-ausw="' + l.id + '" title="Auswertung nach Aufgaben">▮▮▯ Auswertung</button>' : '') + '</th>');
       }
       h += '<th rowspan="2" class="catavg">Ø<small>' + esc(c.name) + '</small></th>';
@@ -1144,7 +1192,7 @@
           L.forEach((l, i) => { const ro = modusOf(l) === 'aufgaben';
             const nm = modusOf(l) === 'note';
             h += '<td class="pc' + (i === 0 ? ' catstart' : '') + '"><span class="g" id="g-' + l.id + '-' + s.id + '"></span><input data-l="' + l.id + '" data-s="' + s.id + '" data-r="' + r + '" value="' + esc(l.werte[s.id] ?? '') +
-            '" inputmode="' + (nm ? 'text' : 'decimal') + '" autocomplete="off" class="' + (nm ? 'nm' : ro ? 'pt ro' : 'pt') + '"' + (ro ? ' readonly title="Summe der Aufgaben – klicken zum Bearbeiten"' : nm ? '' : ' title="Punkte"') + '></td>'; });
+            '" inputmode="' + (nm ? 'text' : 'decimal') + '" autocomplete="off" class="' + (nm ? 'nm' : ro ? 'pt ro' : 'pt') + '"' + (ro ? ' readonly title="Summe der Aufgaben – klicken zum Bearbeiten"' : nm ? '' : modusOf(l) === 'sport' ? ' title="Leistung: Zeit in Sekunden (z. B. 13,4 oder 1:32,5) bzw. Weite/Höhe in Metern"' : ' title="Punkte"') + '></td>'; });
         }
         h += '<td class="catavg" id="a-' + c.id + '-' + s.id + '"></td>';
         tagKc(h0, c);
@@ -1247,10 +1295,12 @@
           sp.innerHTML = ''; sp.style.display = 'none';
           inp.style.background = ''; inp.style.color = '';
           inp.classList.toggle('nmok', !!cc);
-        } else { sp.style.display = ''; sp.innerHTML = x.state === 'ok' ? '<span class="gbig">' + esc(x.label) + '</span>' : ''; }
+        } else { sp.style.display = ''; sp.innerHTML = x.state === 'ok' ? '<span class="gbig">' + esc(x.label) + '</span>'
+          : x.state === 'nog' ? '<span class="spwarn" title="Für die Wertungstabelle fehlt bei dieser Person m/w – klicken zum Festlegen">m/w?</span>'
+          : x.state === 'notab' ? '<span class="spwarn" title="Für dieses Geschlecht ist keine Wertungstabelle gewählt – Eintrag bearbeiten">Tabelle?</span>' : ''; }
         inp.classList.toggle('bad', x.state === 'bad');
         inp.classList.toggle('skip', x.state === 'skip');
-        if (!inp.classList.contains('ro')) inp.title = x.state === 'bad' ? (l.typ === 'note' ? 'Ungültige Note' : 'Ungültig: Punkte zwischen 0 und ' + num(getR(l, k.stufe).total)) : '';
+        if (!inp.classList.contains('ro')) inp.title = x.state === 'bad' ? (l.typ === 'note' ? 'Ungültige Note' : l.modus === 'sport' ? 'Ungültig: Zeit in Sekunden (z. B. 13,4 oder 1:32,5) bzw. Weite/Höhe in Metern (z. B. 4,35)' : 'Ungültig: Punkte zwischen 0 und ' + num(getR(l, k.stufe).total)) : (l.modus === 'sport' && x.state === 'ok' ? 'Leistung ' + num(x.perf) + ' → Note ' + x.label : '');
         if (x.state === 'ok') (colVals[l.id] = colVals[l.id] || []).push(x.v);
       });
       const st = stats(k, s.id);
@@ -1748,8 +1798,9 @@
       st.vor = find(/vorname|rufname/);
       if (st.vor === st.nach) st.vor = -1;
       st.klasse = find(/^klasse|klasse$|^kurs|lerngruppe/);
+      st.gesch = find(/geschlecht|^m\/w$|^sex$|^gender$/);
       if (!hasHead){ // ohne Überschrift: 1. Spalte Nachname, 2. Spalte Vorname, falls vorhanden
-        st.nach = 0; st.vor = (rows[0] || []).length > 1 ? 1 : -1; st.klasse = -1;
+        st.nach = 0; st.vor = (rows[0] || []).length > 1 ? 1 : -1; st.klasse = -1; st.gesch = -1;
       }
     };
     guess();
@@ -1766,7 +1817,7 @@
         let name = v ? (st.format === 'nv' ? n + ', ' + v : v + ' ' + n) : n;
         name = name.replace(/\s+/g, ' ').trim();
         const kl = st.klasse >= 0 ? String(r[st.klasse] ?? '').trim() : '';
-        out.push({name, kl});
+        out.push({name, kl, g: st.gesch >= 0 ? normG(r[st.gesch]) : ''});
       });
       return out;
     };
@@ -1778,6 +1829,7 @@
         '<div class="grid3" style="grid-template-columns:1fr 1fr 1fr"><div class="field"><label>Nachname bzw. Name</label>' + colSel('iNach', st.nach) + '</div>' +
         '<div class="field"><label>Vorname</label>' + colSel('iVor', st.vor, true) + '</div>' +
         '<div class="field"><label>Klasse / Kurs</label>' + colSel('iKl', st.klasse, true) + '</div></div>' +
+        '<div class="field" style="max-width:33%"><label>Geschlecht (m/w, optional)</label>' + colSel('iGes', st.gesch ?? -1, true) + '</div>' +
         (st.vor >= 0 ? '<div class="field"><span class="lbl">Schreibweise</span><div class="seg"><label><input type="radio" name="iFmt" value="nv"' + (st.format === 'nv' ? ' checked' : '') + '>Nachname, Vorname</label><label><input type="radio" name="iFmt" value="vn"' + (st.format === 'vn' ? ' checked' : '') + '>Vorname Nachname</label></div></div>' : '');
       if (groups){
         h += '<div class="keybox" style="margin-bottom:12px">Die Datei enthält <b>' + groups.length + '</b> Klasse(n): ' + groups.map(g => esc(g) + ' (' + R.filter(x => (x.kl || '(ohne Klasse)') === g).length + ')').join(', ') +
@@ -1801,6 +1853,7 @@
       on('iNach', 'change', e => { st.nach = +e.target.value; render(); });
       on('iVor', 'change', e => { st.vor = +e.target.value; render(); });
       on('iKl', 'change', e => { st.klasse = +e.target.value; render(); });
+      on('iGes', 'change', e => { st.gesch = +e.target.value; render(); });
       on('iName', 'input', e => { st.neuName = e.target.value; });
       on('iKid', 'change', e => { st.kid = e.target.value; });
       on('iSort', 'change', e => { st.sort = e.target.checked; });
@@ -1814,7 +1867,10 @@
       const addTo = (k, list) => {
         const have = new Set(k.schueler.map(s => s.name.toLowerCase()));
         let n = 0;
-        list.forEach(x => { if (!have.has(x.name.toLowerCase())){ k.schueler.push({id:uid(), name:x.name, zeugnis:''}); have.add(x.name.toLowerCase()); n++; } });
+        list.forEach(x => {
+          if (!have.has(x.name.toLowerCase())){ const s = {id:uid(), name:x.name, zeugnis:''}; if (x.g) s.geschlecht = x.g; k.schueler.push(s); have.add(x.name.toLowerCase()); n++; }
+          else if (x.g){ const s = k.schueler.find(y => y.name.toLowerCase() === x.name.toLowerCase()); if (s) s.geschlecht = x.g; }   // vorhandene: m/w ergänzen
+        });
         if (st.sort) k.schueler.sort((a, b) => a.name.localeCompare(b.name, 'de'));
         return n;
       };
@@ -1863,7 +1919,7 @@
       : '<p class="hint">Noch keine Vorlagen. Lege eine neue Vorlage an oder speichere die Einstellungen einer Klasse über „Als Vorlage speichern …“.</p>';
     openDialog('Vorlagen für Kategorien & Gewichtung',
       '<p class="hint" style="margin-top:0">Eine Vorlage enthält Stufe, Kategorien und Gewichtung – z. B. „Englisch Unterstufe“. Beim Anlegen einer Klasse lädst du die Vorlage, gibst der Klasse einen Namen und speicherst. Die Vorlage selbst bleibt unverändert erhalten.</p>' + list,
-      [{label:'+ Neue Vorlage', onClick:() => { setTimeout(() => openKlasse(null, {}), 0); }}, {label:'Schließen', cls:'primary'}], true);
+      [{label:'Sport-Wertungstabellen …', onClick:() => { setTimeout(openSport, 0); }}, {label:'+ Neue Vorlage', onClick:() => { setTimeout(() => openKlasse(null, {}), 0); }}, {label:'Schließen', cls:'primary'}], true);
     dlg.querySelector('.dlgbody').addEventListener('click', e => {
       const ed = e.target.closest('[data-tedit]'), cp = e.target.closest('[data-tcopy]'), del = e.target.closest('[data-tdel]');
       if (ed){ const v = DB.vorlagen.find(x => x.id === ed.dataset.tedit); dlg.close(); openKlasse(null, v); }
@@ -1891,12 +1947,94 @@
   }
 
   const refreshView = () => { if (DB.view === 'sitz') renderSitz(); else renderBuch(); };
+
+  /* ---------- m/w für alle Schüler·innen einer Klasse festlegen ---------- */
+  function openGeschlecht(k){
+    const rows = k.schueler.map((s, i) => '<div class="grow"><span class="gnr">' + (i + 1) + '</span><span class="gname">' + esc(s.name) + '</span><div class="seg gseg">' +
+      [['m', 'm'], ['w', 'w']].map(([v, t]) => '<label><input type="radio" name="g-' + s.id + '" value="' + v + '"' + (s.geschlecht === v ? ' checked' : '') + '>' + t + '</label>').join('') + '</div></div>').join('');
+    openDialog('Jungen / Mädchen – ' + k.name,
+      '<p class="hint" style="margin-top:0">Wird für die Sport-Wertungstabellen gebraucht: Jede Person bekommt automatisch die Note aus der passenden Tabelle. Tipp: Beim Klassen-Import kann auch eine Spalte „Geschlecht“ (m/w) mit eingelesen werden.</p><div class="glist">' + rows + '</div>',
+      [{label:'Abbrechen'}, {label:'Speichern', cls:'primary', onClick:() => {
+        k.schueler.forEach(s => { const r = dlg.querySelector('input[name="g-' + s.id + '"]:checked'); if (r) s.geschlecht = r.value; });
+        saveDB(); renderBuch();
+      }}], true);
+  }
+
+  /* ---------- Sport-Wertungstabellen verwalten ---------- */
+  function spCsv(){
+    const L = ['Geschlecht;Klasse;Disziplin;Einheit;' + SP_STUF.join(';')];
+    DB.sport.slice().sort((a, b) => a.g.localeCompare(b.g) || a.kl - b.kl || a.name.localeCompare(b.name, 'de'))
+      .forEach(t => L.push([t.g, t.kl, t.name, t.einheit].concat(t.w.map(x => num(+x))).map(csvCell).join(';')));
+    return '\ufeff' + L.join('\r\n') + '\r\n';
+  }
+  function spImportRows(rows){
+    const head = rows.findIndex(r => r.some(c => /disziplin/i.test(c)) && SP_STUF.every(lab => r.some(c => String(c).trim() === lab)));
+    if (head < 0) throw new Error('Keine Kopfzeile gefunden. Erwartet: Geschlecht; Klasse; Disziplin; Einheit; 1; 1-; 1-2; 2+; … ; 6+');
+    const h = rows[head].map(c => String(c).trim()), col = re => h.findIndex(c => re.test(c));
+    const cG = col(/geschl|^m\/w$|^g$/i), cK = col(/klasse|jahrgang/i), cD = col(/disziplin/i), cE = col(/einheit/i), cS = SP_STUF.map(lab => h.indexOf(lab));
+    if (cG < 0 || cK < 0) throw new Error('Spalten „Geschlecht“ und „Klasse“ fehlen.');
+    const out = [], skipped = [];
+    rows.slice(head + 1).forEach((r, i) => {
+      const name = String(r[cD] ?? '').trim(); if (!name) return;
+      const g = normG(r[cG]), kl = parseInt(String(r[cK]).replace(/\D/g, ''), 10);
+      const w = cS.map(c => parseFloat(String(r[c] ?? '').replace(',', '.')));
+      if (!g || !kl || w.some(x => isNaN(x))){ skipped.push(head + i + 2); return; }
+      const e = String(cE >= 0 ? r[cE] : '').trim().toLowerCase();
+      const einheit = /^(s|sek|sec|sekunden|zeit)$/.test(e) ? 's' : /^(m|meter|weite|höhe|hoehe|strecke)$/.test(e) ? 'm' : (w[0] < w[w.length - 1] ? 's' : 'm');
+      out.push({g, kl, name, einheit, w});
+    });
+    return {out, skipped};
+  }
+  function openSport(){
+    const kls = [...new Set(DB.sport.map(t => +t.kl))].sort((a, b) => a - b);
+    const list = kls.length ? kls.map(kl => '<div class="spkl"><b>Klasse ' + kl + '</b>' + ['m', 'w'].map(g => {
+        const T = spTabs(kl).filter(t => t.g === g); if (!T.length) return '';
+        return '<div><span class="hint" style="margin:0">' + (g === 'm' ? 'Jungen' : 'Mädchen') + ':</span> ' + T.map(t => '<button type="button" class="spchip" data-sp="' + esc(g + '|' + kl + '|' + t.name) + '">' + esc(t.name) + '</button>').join('') + '</div>'; }).join('') + '</div>').join('')
+      : '<p class="hint">Noch keine Wertungstabellen. Importiere eine CSV- oder Excel-Datei im Aufbau<br><code>Geschlecht; Klasse; Disziplin; Einheit; 1; 1-; 1-2; 2+; 2; … ; 5-6; 6+</code><br>Einheit: <b>s</b> = Zeit (weniger ist besser), <b>m</b> = Meter (Weite, Höhe oder Laufstrecke – mehr ist besser).</p>';
+    openDialog('Sport-Wertungstabellen',
+      (kls.length ? '<p class="hint" style="margin-top:0">' + DB.sport.length + ' Tabellen. Antippen zeigt die Grenzwerte. Beim Import werden gleichnamige Tabellen (gleiches Geschlecht, Klasse, Disziplin) ersetzt.</p>' : '') +
+      list + '<div id="spDetail"></div>',
+      [{label:'Importieren …', onClick:() => { spImport(); return false; }},
+       {label:'Als CSV exportieren', onClick:() => { if (!DB.sport.length) return false; download('Sport-Wertungstabellen.csv', spCsv(), 'text/csv;charset=utf-8'); return false; }},
+       {label:'Alle löschen', cls:'danger', onClick:() => { if (!DB.sport.length || !confirm('Alle ' + DB.sport.length + ' Wertungstabellen löschen? Bereits eingetragene Sportnoten können dann nicht mehr berechnet werden.')) return false; DB.sport = []; saveDB(); renderBuch(); setTimeout(openSport, 0); }},
+       {label:'Schließen', cls:'primary'}], true);
+    dlg.querySelector('.dlgbody').addEventListener('click', e => {
+      const b = e.target.closest('[data-sp]'); if (!b) return;
+      const [g, kl, name] = b.dataset.sp.split('|'), t = spFind(kl, g, name); if (!t) return;
+      dlg.querySelectorAll('.spchip').forEach(x => x.classList.toggle('on', x === b));
+      dq('#spDetail').innerHTML = '<div class="keybox" style="margin-top:12px"><div class="keysum">Klasse ' + kl + ' · ' + (g === 'm' ? 'Jungen' : 'Mädchen') + ' · ' + esc(name) + ' · ' + (spIsZeit(t) ? 'Zeit in Sekunden' : 'Meter') + '</div><div class="keymini">' +
+        SP_STUF.map((lab, i) => '<span><b>' + lab + '</b> ' + (spIsZeit(t) ? '≤ ' : '≥ ') + num(+t.w[i]) + '</span>').join('') + '<span><b>6</b> ' + (spIsZeit(t) ? 'langsamer' : 'weniger') + '</span></div></div>';
+    });
+  }
+  function spImport(){
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.csv,.txt,.tsv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      try {
+        const buf = await f.arrayBuffer();
+        const isZip = new Uint8Array(buf, 0, 2)[0] === 0x50 && new Uint8Array(buf, 0, 2)[1] === 0x4b;
+        const sheets = isZip ? await parseXlsx(buf) : parseCsv(decodeText(buf));
+        let out = [], skipped = [], err = null;
+        sheets.forEach(sh => { try { const r = spImportRows(sh.rows); out = out.concat(r.out); skipped = skipped.concat(r.skipped); } catch (e2){ err = e2; } });
+        if (!out.length) throw err || new Error('Keine Tabellen gefunden.');
+        let neu = 0, ersetzt = 0;
+        out.forEach(t => { const i = DB.sport.findIndex(x => x.g === t.g && +x.kl === +t.kl && x.name === t.name); if (i >= 0){ DB.sport[i] = t; ersetzt++; } else { DB.sport.push(t); neu++; } });
+        saveDB(); renderBuch(); dlg.close();
+        alert(out.length + ' Wertungstabellen importiert (' + neu + ' neu, ' + ersetzt + ' ersetzt).' + (skipped.length ? '\nÜbersprungen (unvollständig): Zeile ' + skipped.join(', ') : ''));
+        setTimeout(openSport, 0);
+      } catch (e){ alert('Die Wertungstabellen konnten nicht gelesen werden.\n' + (e && e.message ? e.message : '')); }
+    };
+    inp.click();
+  }
   function openSchueler(k, s){
     const foto = fotoCache.get(s.id);
     const stamp = t => new Date(t).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     openDialog('Schüler·in – ' + k.name,
       '<div class="row" style="align-items:flex-end;gap:12px">' + (foto ? '<img src="' + foto + '" class="minifoto" alt="">' : '') +
       '<div class="field" style="flex:1;margin:0"><label>Name</label><input type="text" id="sName" value="' + esc(s.name) + '"></div></div>' +
+      '<div class="field" style="margin-top:12px"><span class="lbl">Geschlecht (für Sport-Wertungstabellen)</span><div class="seg" style="max-width:340px">' +
+        [['m', 'männlich'], ['w', 'weiblich'], ['', 'offen']].map(([v, t]) => '<label><input type="radio" name="sGes" value="' + v + '"' + ((s.geschlecht || '') === v ? ' checked' : '') + '>' + t + '</label>').join('') + '</div></div>' +
       '<div class="field" style="margin-top:14px"><div class="row" style="justify-content:space-between"><label for="sNotiz" style="margin:0;font-weight:600;font-size:13px">Notizen</label>' +
       '<button type="button" class="btn" id="sDatum" style="padding:3px 10px">📅 Datum einfügen</button></div>' +
       '<textarea id="sNotiz" rows="9" placeholder="z. B. Beobachtungen, Elterngespräche, Förderhinweise, Absprachen …" style="margin-top:6px">' + esc(s.notiz || '') + '</textarea>' +
@@ -1915,7 +2053,8 @@
         if (notiz !== (s.notiz || '')){
           if (notiz){ s.notiz = notiz; s.notizAt = Date.now(); } else { delete s.notiz; delete s.notizAt; }
         }
-        s.name = n; saveDB(); refreshView();
+        s.name = n; const gs = dq('input[name=sGes]:checked'); if (gs){ if (gs.value) s.geschlecht = gs.value; else delete s.geschlecht; }
+        saveDB(); refreshView();
       }}], true);
     // Enter im Notizfeld beginnt eine neue Zeile (statt zu speichern)
     dq('#sNotiz').addEventListener('keydown', e => { if (e.key === 'Enter') e.stopPropagation(); });
@@ -1933,7 +2072,8 @@
   const MODI = {
     note:     {t:'Note direkt eintragen', d:'Noten direkt in die Tabelle tippen (z. B. 2-, 3+, 2-3).'},
     gesamt:   {t:'Gesamtpunktzahl eintragen', d:'Eingabefenster mit allen Schüler·innen; die Note ergibt sich aus dem Notenschlüssel.'},
-    aufgaben: {t:'Punkte für die Aufgaben eintragen', d:'Eingabefenster mit allen Schüler·innen und Aufgaben; Summe, Note und Auswertung je Aufgabe.'}
+    aufgaben: {t:'Punkte für die Aufgaben eintragen', d:'Eingabefenster mit allen Schüler·innen und Aufgaben; Summe, Note und Auswertung je Aufgabe.'},
+    sport:    {t:'Sportleistung (Wertungstabelle)', d:'Zeiten, Weiten oder Höhen direkt in die Tabelle tippen; die Note kommt aus der Wertungstabelle für Jahrgang und Geschlecht.'}
   };
   const modusOf = l => l.modus || (l.typ === 'note' ? 'note' : 'gesamt');
 
@@ -1961,7 +2101,7 @@
       '<div class="field"><label>Kategorie</label><select id="lKat">' + katList.map(c => '<option value="' + c.id + '"' + (c.id === d.kat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></div>' +
       '<div class="field"><label>Gewicht</label><input type="number" id="lGew" min="0" step="0.5" value="' + d.gew + '"></div></div>' +
       '<div class="field"><span class="lbl">Wie soll eingetragen werden?</span><div class="modi">' +
-      Object.entries(MODI).map(([m, o]) => '<label class="modus"><input type="radio" name="lModus" value="' + m + '"' + (d.modus === m ? ' checked' : '') + '><span><b>' + o.t + '</b><small>' + o.d + '</small></span></label>').join('') +
+      Object.entries(MODI).filter(([m]) => m !== 'sport' || d.modus === 'sport' || (k.stufe !== 'kurs' && DB.sport.length)).map(([m, o]) => '<label class="modus"><input type="radio" name="lModus" value="' + m + '"' + (d.modus === m ? ' checked' : '') + '><span><b>' + o.t + '</b><small>' + o.d + '</small></span></label>').join('') +
       '</div></div><div id="lAufg"></div><div id="lKey"></div>';
     const modus = () => dlg.querySelector('input[name=lModus]:checked').value;
     const readAufg = () => dlg.querySelectorAll('.lat').forEach((row, i) => {
@@ -1972,16 +2112,17 @@
     const readForm = () => {
       d.name = dq('#lName').value.trim(); d.datum = dq('#lDatum').value;
       d.gew = Math.max(0, parseFloat(String(dq('#lGew').value).replace(',', '.')) || 0);
-      d.kat = dq('#lKat').value; d.modus = modus(); d.typ = d.modus === 'note' ? 'note' : 'punkte';
+      d.kat = dq('#lKat').value; d.modus = modus(); d.typ = d.modus === 'note' ? 'note' : d.modus === 'sport' ? 'sport' : 'punkte';
       if (d.modus === 'aufgaben'){ readAufg(); if (aufgSum() > 0) d.key.total = aufgSum(); }
     };
     const commit = () => {
       readForm();
       if (!d.name){ dq('#lName').classList.add('invalid'); dq('#lName').focus(); return false; }
       if (d.modus === 'aufgaben' && !(aufgSum() > 0)){ alert('Bitte für die Aufgaben Maximalpunkte eintragen.'); return false; }
+      if (d.modus === 'sport' && !(d.sport && (d.sport.m || d.sport.w))){ alert('Bitte Jahrgang und Disziplin der Wertungstabelle wählen.'); return false; }
       if (!isNew && origModus !== d.modus && Object.keys(l.werte).length &&
           !confirm('Die Art der Eintragung wird geändert. Bereits eingetragene Werte bleiben stehen' +
-            (d.modus === 'note' ? ', werden aber nun als Noten gelesen.' : d.modus === 'aufgaben' ? ' und werden beim nächsten Speichern im Eingabefenster durch die Aufgabensummen ersetzt.' : ' und werden als Punkte gelesen.') + ' Fortfahren?')) return false;
+            (d.modus === 'note' ? ', werden aber nun als Noten gelesen.' : d.modus === 'sport' ? ' und werden nun als Zeiten bzw. Weiten gelesen.' : d.modus === 'aufgaben' ? ' und werden beim nächsten Speichern im Eingabefenster durch die Aufgabensummen ersetzt.' : ' und werden als Punkte gelesen.') + ' Fortfahren?')) return false;
       if (d.modus === 'aufgaben'){ // Summen aktualisieren
         const ids = new Set(d.aufgaben.map(t => t.id));
         Object.values(d.ap || {}).forEach(p => Object.keys(p).forEach(tid => { if (!ids.has(tid)) delete p[tid]; }));
@@ -2003,8 +2144,38 @@
       if (dq('#laDel')) dq('#laDel').onclick = () => { readAufg(); d.aufgaben.pop(); renderAufgDef(); };
       upd();
     };
+    let spBaseSel = d.sport ? spBase(d.sport.m || d.sport.w || '') : null;
+    const renderSport = () => {
+      const box = dq('#lKey');
+      const kls = [...new Set(DB.sport.map(t => +t.kl))].sort((a, b) => a - b);
+      if (!kls.length){ box.innerHTML = '<div class="keybox">Es sind noch keine Sport-Wertungstabellen hinterlegt. Importiere sie unter <b>Vorlagen … › Sport-Wertungstabellen</b>.</div>'; return; }
+      const sp = d.sport || (d.sport = {kl: kls.includes(spKlasseGuess(k)) ? spKlasseGuess(k) : kls[0], m:'', w:''});
+      if (!kls.includes(+sp.kl)) sp.kl = kls[0];
+      const T = spTabs(sp.kl), bases = [...new Set(T.map(t => spBase(t.name)))];
+      if (!bases.includes(spBaseSel)) spBaseSel = bases[0];
+      const opts = g => T.filter(t => t.g === g && spBase(t.name) === spBaseSel).map(t => t.name);
+      ['m', 'w'].forEach(g => { const o = opts(g); if (!o.includes(sp[g])) sp[g] = o[0] || ''; });
+      if (isNew && !nameTouched) dq('#lName').value = spBaseSel;
+      const sel = (id, list, val, none) => '<select id="' + id + '">' + (none ? '<option value="">– keine Tabelle –</option>' : '') + list.map(x => '<option value="' + esc(String(x)) + '"' + (String(x) === String(val) ? ' selected' : '') + '>' + esc(String(x)) + '</option>').join('') + '</select>';
+      const prev = g => { const t = spFind(sp.kl, g, sp[g]); if (!t) return '';
+        return '<div class="spprev"><div class="keysum">' + (g === 'm' ? 'Jungen' : 'Mädchen') + ' · ' + esc(t.name) + ' · ' + (spIsZeit(t) ? 'Zeit in Sekunden – weniger ist besser' : 'Meter – mehr ist besser') + '</div><div class="keymini">' +
+          SP_STUF.map((lab, i) => '<span><b>' + lab + '</b> ' + (spIsZeit(t) ? '≤ ' : '≥ ') + num(+t.w[i]) + '</span>').join('') + '</div></div>'; };
+      const miss = k.schueler.filter(x => x.geschlecht !== 'm' && x.geschlecht !== 'w').length;
+      box.innerHTML = '<div class="keybox"><div class="grid3" style="grid-template-columns:110px 1fr 1fr"><div class="field"><label>Jahrgang</label>' + sel('spKl', kls, sp.kl) + '</div>' +
+        '<div class="field" style="grid-column:span 2"><label>Disziplin</label>' + sel('spDis', bases, spBaseSel) + '</div></div>' +
+        '<div class="grid2"><div class="field"><label>Tabelle Jungen</label>' + sel('spM', opts('m'), sp.m, true) + '</div><div class="field"><label>Tabelle Mädchen</label>' + sel('spW', opts('w'), sp.w, true) + '</div></div>' +
+        prev('m') + prev('w') +
+        (miss ? '<div class="hint" style="color:#b45309">Bei ' + miss + ' Schüler·innen ist noch nicht festgelegt, ob die Tabelle für Jungen oder Mädchen gilt. <button type="button" class="btn" id="spGes" style="margin-left:6px">Speichern &amp; m/w festlegen …</button></div>' : '') +
+        '</div>';
+      dq('#spKl').onchange = e => { sp.kl = +e.target.value; renderSport(); };
+      dq('#spDis').onchange = e => { spBaseSel = e.target.value; sp.m = sp.w = ''; renderSport(); };
+      dq('#spM').onchange = e => { sp.m = e.target.value; renderSport(); };
+      dq('#spW').onchange = e => { sp.w = e.target.value; renderSport(); };
+      if (dq('#spGes')) dq('#spGes').onclick = () => { if (commit() === false) return; dlg.close(); setTimeout(() => openGeschlecht(k), 0); };
+    };
     const renderKey = () => {
       const box = dq('#lKey');
+      if (modus() === 'sport') return renderSport();
       if (modus() === 'note'){ box.innerHTML = ''; return; }
       const R = compute(k.stufe, d.key);
       box.innerHTML = '<div class="keybox"><div class="keysum">Notenschlüssel: ' + keySummary(k.stufe, d.key) + '</div>' +
@@ -2025,7 +2196,7 @@
     buttons.push({label:'Weiter: Noten / Punkte eintragen →', cls:'primary', onClick:() => {
       if (commit() === false) return false;
       const target = k.leistungen.find(x => x.id === d.id);
-      if (modusOf(target) === 'note') setTimeout(() => { const inp = document.querySelector('input[data-l="' + target.id + '"]'); if (inp){ inp.focus(); inp.scrollIntoView({block:'nearest', inline:'center'}); } }, 0);
+      if (modusOf(target) === 'note' || modusOf(target) === 'sport') setTimeout(() => { const inp = document.querySelector('input[data-l="' + target.id + '"]'); if (inp){ inp.focus(); inp.scrollIntoView({block:'nearest', inline:'center'}); } }, 0);
       else setTimeout(() => openPunkte(k, target), 0);
     }});
     openDialog(isNew ? 'Neue Arbeit / neuer Test – ' + k.name : 'Arbeit / Test bearbeiten', html, buttons, true);
@@ -2149,7 +2320,7 @@
   const hasAusw = (k, l) => !isNoteKat(k.kats.find(c => c.id === l.kat) || {}) && k.schueler.some(s => cellVal(k, l, s.id).state === 'ok');
 
   function auswData(k, l){
-    const modus = modusOf(l), kurs = k.stufe === 'kurs', pts = modus !== 'note';
+    const modus = modusOf(l), kurs = k.stufe === 'kurs', pts = modus !== 'note' && modus !== 'sport';
     const R = pts ? compute(k.stufe, l.key) : null;
     const T = modus === 'aufgaben' ? (l.aufgaben || []) : [];
     const isNum = v => /^\d+([.,]\d+)?$/.test(String(v).trim());
@@ -2725,6 +2896,7 @@
   const main = $('buchMain');
   main.addEventListener('click', e => {
     const k = aktKlasse();
+    if (e.target.closest('.spwarn') && k){ const t = e.target.closest('.spwarn'); if (t.textContent === 'm/w?') return openGeschlecht(k); }
     const so = e.target.closest('td.nr[data-solo]');
     if (so && k){ solo = solo ? null : {kid:k.id, sid:so.dataset.solo}; renderBuch(); return; }
     const sa = e.target.closest('[data-act^=solo]');
@@ -3406,6 +3578,7 @@
     const data = JSON.parse(TD.decode(await unseal(DEK, LOCK.data)));
     DB = data.db || {klassen:[], aktiv:null, view:'buch'};
     if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
+    if (!Array.isArray(DB.sport)) DB.sport = [];
     if (data.s && data.s.mittel && data.s.kurs) S = data.s;
     lockEl.hidden = true; document.body.classList.remove('locked');
     lastAct = Date.now(); updateLockUI();
@@ -3442,7 +3615,7 @@
     if (entry) finishEntry(true);
     await persistEnc();
     DEK = null; DEKraw = null; SEC = null; clearTimeout(syncTimer); fotoCache.clear();
-    DB = {klassen:[], aktiv:null, view:DB.view, vorlagen:[]}; S = copy(DEF);
+    DB = {klassen:[], aktiv:null, view:DB.view, vorlagen:[], sport:[]}; S = copy(DEF);
     if ($('list')) $('list').value = '';
     if ($('calcPts')) $('calcPts').value = '';
     setView(safeView(DB.view));   // Oberfläche ohne Daten neu aufbauen
@@ -3607,7 +3780,7 @@
   }
 
   // --- Änderungen erkennen ---
-  const dataSer = () => JSON.stringify([DB.klassen, DB.vorlagen]);
+  const dataSer = () => JSON.stringify([DB.klassen, DB.vorlagen, DB.sport]);
   let lastSer = null;
   function trackChange(){
     if (isLocked()) return;
@@ -3637,7 +3810,7 @@
   const payloadNow = async () => ({db:DB, s:S, fotos: await fotoAll()});
   function applyPayload(data, keepView){
     const view = DB.view, aktiv = DB.aktiv;
-    DB = data.db || data.notenbuch; if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
+    DB = data.db || data.notenbuch; if (!Array.isArray(DB.vorlagen)) DB.vorlagen = []; if (!Array.isArray(DB.sport)) DB.sport = [];
     if (keepView){ DB.view = view; if (DB.klassen.some(k => k.id === aktiv)) DB.aktiv = aktiv; }
     const s = data.s || data.rechner;
     if (s && s.mittel && s.kurs){ S = s; delete S.link; delete S.linkBackup; }
