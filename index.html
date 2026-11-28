@@ -157,6 +157,7 @@
   table.gb.solo td.nr[data-solo]{background:var(--grad-btn);color:#fff;font-weight:700}
   .solobar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#eef2fb;border:1px solid #c9d3ea;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:14px}
   .solobar .sp{flex:1}
+  #updBar{position:fixed;left:12px;right:12px;margin:0 auto;width:fit-content;bottom:18px;z-index:100;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#fff;border:1px solid #c9d3ea;box-shadow:0 10px 30px rgba(20,30,60,.22);border-radius:12px;padding:10px 14px;font-size:14px;max-width:calc(100vw - 24px)}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
   .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
   .emptystate h2{color:var(--ink)}
@@ -884,6 +885,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
+  const APP_VERSION = '22';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
   const katTyp = c => c && c.typ === 'note' ? 'note' : 'punkte';
   // Farbcodierung der Kategorien (bewusst ohne Grün/Gelb/Rot, damit sie nicht mit den Notenfarben verwechselt wird)
   const KFARBEN = [['blau','Blau','#3f6ccc'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
@@ -2620,11 +2622,40 @@
 
   /* ---------- Offline-Funktion (nur über die Web-Adresse, nicht als lokale Datei) ---------- */
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
+  let verChecked = 0;
   const offEl = $('offlineStatus');
+  if (offEl) offEl.textContent = 'Version ' + APP_VERSION;
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
-    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => {
-      if (offEl) offEl.innerHTML = '<span style="color:#2e9e4f">●</span> Offline verfügbar';
-    }).catch(() => { if (offEl) offEl.textContent = ''; });
+    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(reg => {
+      // beim Zurückkehren in die App nach einer neuen Version schauen
+      const chk = () => { try { reg.update(); } catch(e){} checkVersion(); };
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') chk(); });
+      window.addEventListener('focus', chk);
+      return navigator.serviceWorker.ready;
+    }).then(() => {
+      if (offEl) offEl.innerHTML = '<span style="color:#2e9e4f">●</span> Offline verfügbar · Version ' + APP_VERSION;
+    }).catch(() => { if (offEl) offEl.textContent = 'Version ' + APP_VERSION; });
+    checkVersion();
+  }
+  // Prüft direkt bei GitHub, ob es eine neuere Version gibt, und bietet das Aktualisieren an
+  function checkVersion(){
+    if (!/^https?:$/.test(location.protocol) || !navigator.onLine || Date.now() - verChecked < 60000) return;
+    verChecked = Date.now();
+    fetch('index.html?vc=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.text() : '').then(t => {
+      const m = /const APP_VERSION = '(\d+)'/.exec(t);
+      if (!m || +m[1] <= +APP_VERSION || document.getElementById('updBar')) return;
+      const b = document.createElement('div'); b.id = 'updBar'; b.className = 'noprint';
+      b.innerHTML = '<span>Eine neue Version des Notenbuchs ist da (Version ' + m[1] + ').</span><button class="btn primary" type="button">Jetzt aktualisieren</button><button class="btn" type="button">Später</button>';
+      const [up, later] = b.querySelectorAll('button');
+      up.onclick = async () => {
+        up.disabled = true; up.textContent = 'Wird geladen …';
+        try { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); } catch(e){}
+        try { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch(e){}
+        location.reload();
+      };
+      later.onclick = () => b.remove();
+      document.body.appendChild(b);
+    }).catch(() => {});
   }
   const netState = () => { if (offEl && !navigator.onLine) offEl.innerHTML = '<span style="color:var(--warn)">●</span> Offline – Änderungen werden lokal gespeichert'; };
   window.addEventListener('offline', netState);
