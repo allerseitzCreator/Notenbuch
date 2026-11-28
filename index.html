@@ -902,7 +902,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '30';
+  const APP_VERSION = '31';
   /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
   const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
   const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
@@ -1091,6 +1091,18 @@
     const worse = k.stufe === 'kurs' ? (a, b) => a.x.v < b.x.v : (a, b) => a.x.v > b.x.v;
     return ok.reduce((w, o) => worse(o, w) ? o : w).l.id;
   }
+  // Wie wird mit den Kategorie-Schnitten zur Gesamtnote weitergerechnet?
+  const RUNDUNG = {exakt:'mit den exakten Werten', ab1:'nach der 1. Nachkommastelle abbrechen', r1:'auf 1 Nachkommastelle runden', r2:'auf 2 Nachkommastellen runden'};
+  const RUND_KURZ = {ab1:'Schnitte nach 1. Nachkommastelle abgebrochen', r1:'Schnitte auf 1 Nachkommastelle gerundet', r2:'Schnitte auf 2 Nachkommastellen gerundet'};
+  function rundSchnitt(k, x){
+    if (x == null) return x;
+    switch (k.rundung){
+      case 'ab1': return Math.floor(x * 10 + 1e-7) / 10;
+      case 'r1':  return Math.round(x * 10 + 1e-7) / 10;
+      case 'r2':  return Math.round(x * 100 + 1e-7) / 100;
+      default:    return x;
+    }
+  }
   function stats(k, sid){
     const cat = {}, grp = {};
     for (const c of k.kats){
@@ -1100,6 +1112,7 @@
         cat[c.id] = avgs.length ? avgs.reduce((x, y) => x + y, 0) / avgs.length : null;
       } else { const sk = struckOf(k, c, sid); cat[c.id] = wmean(k, k.leistungen.filter(l => l.kat === c.id && l.id !== sk), sid); }
     }
+    for (const c of k.kats) cat[c.id] = rundSchnitt(k, cat[c.id]);
     let tw = 0, t = 0; const present = [];
     for (const c of k.kats) if (cat[c.id] != null){ present.push(cat[c.id]); tw += +c.w || 0; t += cat[c.id] * (+c.w || 0); }
     const total = !present.length ? null : tw > 0 ? t / tw : present.reduce((a, b) => a + b, 0) / present.length;
@@ -1161,7 +1174,7 @@
     h += '<div class="buchhead"><div><h2>' + esc(klName(k)) + ' ' + badge(k.stufe) + '</h2><div class="summary">' +
       k.schueler.length + ' Schüler·innen · Gewichtung ' +
       k.kats.map(c => esc(c.name)).join(' : ') + ' = ' + ratioText(k.kats) +
-      (k.kats.length > 1 ? ' (' + k.kats.map(c => num(wPct(k.kats, c), 1) + ' %').join(' / ') + ')' : '') + '</div></div>' +
+      (k.kats.length > 1 ? ' (' + k.kats.map(c => num(wPct(k.kats, c), 1) + ' %').join(' / ') + ')' : '') + (RUND_KURZ[k.rundung] ? ' · ' + RUND_KURZ[k.rundung] : '') + '</div></div>' +
       '<div class="toolbar"><button class="btn primary" data-act="leistung" type="button">+ Arbeit / Test</button>' +
       '<button class="btn" data-act="kategorie" type="button">+ Kategorie</button>' +
       '<button class="btn" data-act="schueler" type="button">+ Schüler·innen</button>' +
@@ -1412,8 +1425,8 @@
   function openKlasse(k, tpl){
     const isTpl = !!tpl;
     const isNew = !k;
-    const d = isTpl ? {name:tpl.name || '', fach:tpl.fach || '', stufe:tpl.stufe || 'mittel', kats:(tpl.kats || defKats('mittel')).map(c => Object.assign({}, c, {id:uid()}))}
-      : k ? {name:k.name, fach:k.fach || '', stufe:k.stufe, kats:copy(k.kats)} : {name:'', fach:'', stufe:'mittel', kats:defKats('mittel')};
+    const d = isTpl ? {name:tpl.name || '', fach:tpl.fach || '', rundung:tpl.rundung || 'exakt', stufe:tpl.stufe || 'mittel', kats:(tpl.kats || defKats('mittel')).map(c => Object.assign({}, c, {id:uid()}))}
+      : k ? {name:k.name, fach:k.fach || '', rundung:k.rundung || 'exakt', stufe:k.stufe, kats:copy(k.kats)} : {name:'', fach:'', rundung:'exakt', stufe:'mittel', kats:defKats('mittel')};
     const locked = !!(k && k.leistungen.length);
     const used = new Set(k ? k.leistungen.map(l => l.kat) : []);
     const html =
@@ -1429,6 +1442,9 @@
       '<label><input type="radio" name="kStufe" value="mittel" ' + (d.stufe === 'mittel' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Mittelstufe (1–6)</label>' +
       '<label><input type="radio" name="kStufe" value="kurs" ' + (d.stufe === 'kurs' ? 'checked' : '') + (locked ? ' disabled' : '') + '>Kursstufe (0–15 VP)</label></div>' +
       (locked ? '<div class="hint">Die Stufe kann nicht mehr geändert werden, weil bereits Leistungen angelegt sind.</div>' : '') + '</div>' +
+      '<div class="field"><label for="kRund">Mit den Schnitten der Kategorien zur Gesamtnote weiterrechnen</label><select id="kRund">' +
+        Object.entries(RUNDUNG).map(([v, t]) => '<option value="' + v + '"' + (d.rundung === v ? ' selected' : '') + '>' + t[0].toUpperCase() + t.slice(1) + '</option>').join('') + '</select>' +
+        '<div class="hint">Beispiel Schnitt 2,38: exakt 2,38 · abbrechen 2,3 · auf 1 Stelle 2,4 · auf 2 Stellen 2,38. Die Gesamtnote wird dann aus diesen Werten gewichtet berechnet.</div></div>' +
       '<div class="field"><label for="kRatio">Gewichtung als Verhältnis</label>' +
       '<input type="text" id="kRatio" value="' + esc(ratioText(d.kats)) + '" placeholder="z. B. 2:1, 4:5 oder 60:40">' +
       '<div class="hint">Reihenfolge wie die Kategorien unten. Auch Dezimalzahlen sind möglich, z. B. 1,5:1.</div></div>' +
@@ -1468,7 +1484,7 @@
       vals.forEach((v, i) => d.kats[i].w = v);
       renderKats(true);
     };
-    const readAll = () => { readKats(); const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value; d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); };
+    const readAll = () => { readKats(); const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value; d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); d.rundung = dq('#kRund').value; };
     const buttons = [];
     if (isTpl){
       if (tpl.id) buttons.push({label:'Vorlage löschen', cls:'danger', onClick:() => {
@@ -1484,7 +1500,7 @@
         const same = DB.vorlagen.find(x => x.name.toLowerCase() === d.name.toLowerCase() && x.id !== tpl.id);
         if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Überschreiben?')) return false;
         if (same) DB.vorlagen = DB.vorlagen.filter(x => x !== same);
-        saveAsTemplate(d.name, d.stufe, kats, tpl.id, d.fach); setTimeout(openVorlagen, 0);
+        saveAsTemplate(d.name, d.stufe, kats, tpl.id, d.fach, d.rundung); setTimeout(openVorlagen, 0);
       }});
     } else {
     if (!isNew) buttons.push({label:'Klasse löschen', cls:'danger', onClick:() => { if (!deleteKlasse(k)) return false; }});
@@ -1495,7 +1511,7 @@
       const name = (prompt('Name der Vorlage (z. B. „Englisch Unterstufe“):', '') || '').trim(); if (!name) return false;
       const same = DB.vorlagen.find(x => x.name.toLowerCase() === name.toLowerCase());
       if (same && !confirm('Es gibt schon eine Vorlage „' + same.name + '“. Mit diesen Einstellungen überschreiben?')) return false;
-      saveAsTemplate(name, d.stufe, kats, same ? same.id : null, d.fach);
+      saveAsTemplate(name, d.stufe, kats, same ? same.id : null, d.fach, d.rundung);
       const sel = dq('#kTpl');
       const box = dlg.querySelector('.tplload');
       if (box) box.innerHTML = '<label for="kTpl">Vorlage laden</label><select id="kTpl"><option value="">– Vorlage wählen –</option>' + DB.vorlagen.map(v => '<option value="' + v.id + '">' + esc(v.name) + ' (' + stufeName(v.stufe) + ')</option>').join('') + '</select><div class="hint" style="color:#2e9e4f">✓ Vorlage „' + esc(name) + '“ gespeichert.</div>';
@@ -1505,17 +1521,17 @@
     buttons.push({label:'Abbrechen'});
     buttons.push({label: isNew ? 'Anlegen' : 'Speichern', cls:'primary', onClick:() => {
       readKats();
-      d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim();
+      d.name = dq('#kName').value.trim(); d.fach = dq('#kFach').value.trim(); d.rundung = dq('#kRund').value;
       if (!d.name){ dq('#kName').classList.add('invalid'); dq('#kName').focus(); return false; }
       d.kats = d.kats.filter(c => c.name);
       if (d.kats.length && !d.kats.some(c => +c.w > 0)){ alert('Mindestens eine Kategorie braucht ein Gewicht größer als 0.'); return false; }
       if (!d.kats.length){ alert('Mindestens eine Kategorie ist nötig.'); d.kats = defKats(d.stufe); renderKats(); return false; }
       const st = dlg.querySelector('input[name=kStufe]:checked'); if (st) d.stufe = st.value;
       if (isNew){
-        const nk = {id:uid(), name:d.name, stufe:d.stufe, kats:d.kats, schueler:[], leistungen:[]}; if (d.fach) nk.fach = d.fach;
+        const nk = {id:uid(), name:d.name, stufe:d.stufe, kats:d.kats, schueler:[], leistungen:[]}; if (d.fach) nk.fach = d.fach; if (d.rundung !== 'exakt') nk.rundung = d.rundung;
         DB.klassen.push(nk); DB.aktiv = nk.id;
       } else {
-        k.name = d.name; if (d.fach) k.fach = d.fach; else delete k.fach; if (!locked) k.stufe = d.stufe; k.kats = d.kats;
+        k.name = d.name; if (d.fach) k.fach = d.fach; else delete k.fach; if (d.rundung && d.rundung !== 'exakt') k.rundung = d.rundung; else delete k.rundung; if (!locked) k.stufe = d.stufe; k.kats = d.kats;
         const ids = new Set(k.kats.map(c => c.id));
         k.leistungen.forEach(l => { if (!ids.has(l.kat)) l.kat = k.kats[0].id; });
       }
@@ -1538,6 +1554,7 @@
         d.kats = nk;
         if (!locked){ d.stufe = v.stufe; dlg.querySelectorAll('input[name=kStufe]').forEach(r => r.checked = r.value === v.stufe); }
         if (v.fach && !dq('#kFach').value.trim()) dq('#kFach').value = v.fach;
+        if (v.rundung) dq('#kRund').value = v.rundung;
         renderKats();
         const hint = sel.parentNode.querySelector('.hint');
         if (hint) hint.innerHTML = '✓ Vorlage „' + esc(v.name) + '“ geladen' + (kept.length ? ' – beibehalten, weil schon Noten darin stehen: ' + kept.map(o => esc(o.name)).join(', ') : '') + '. Die Vorlage selbst bleibt unverändert.';
@@ -2010,8 +2027,8 @@
 
   /* ---------- Vorlagen für Kategorien & Gewichtung ---------- */
   const tplSummary = v => v.kats.map(c => (katFarbe(v.kats, c) !== 'keine' ? '<span class="ckey" style="background:' + farbHex(katFarbe(v.kats, c)) + '"></span>' : '') + esc(c.name) + ' ' + num(wPct(v.kats, c), 0) + ' %').join(' · ');
-  function saveAsTemplate(name, stufe, kats, replaceId, fach){
-    const t = {id: replaceId || uid(), name, stufe, fach: fach || '', kats: kats.map(c => ({name:c.name, w:+c.w || 0, typ:katTyp(c), farbe:katFarbe(kats, c)}))};
+  function saveAsTemplate(name, stufe, kats, replaceId, fach, rundung){
+    const t = {id: replaceId || uid(), name, stufe, fach: fach || '', rundung: rundung || 'exakt', kats: kats.map(c => ({name:c.name, w:+c.w || 0, typ:katTyp(c), farbe:katFarbe(kats, c)}))};
     const i = DB.vorlagen.findIndex(x => x.id === t.id);
     if (i >= 0) DB.vorlagen[i] = t; else DB.vorlagen.push(t);
     DB.vorlagen.sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -2031,7 +2048,7 @@
     dlg.querySelector('.dlgbody').addEventListener('click', e => {
       const ed = e.target.closest('[data-tedit]'), cp = e.target.closest('[data-tcopy]'), del = e.target.closest('[data-tdel]');
       if (ed){ const v = DB.vorlagen.find(x => x.id === ed.dataset.tedit); dlg.close(); openKlasse(null, v); }
-      else if (cp){ const v = DB.vorlagen.find(x => x.id === cp.dataset.tcopy); saveAsTemplate(v.name + ' (Kopie)', v.stufe, v.kats, null, v.fach); dlg.close(); openVorlagen(); }
+      else if (cp){ const v = DB.vorlagen.find(x => x.id === cp.dataset.tcopy); saveAsTemplate(v.name + ' (Kopie)', v.stufe, v.kats, null, v.fach, v.rundung); dlg.close(); openVorlagen(); }
       else if (del){ const v = DB.vorlagen.find(x => x.id === del.dataset.tdel); if (confirm('Vorlage „' + v.name + '“ löschen? Bestehende Klassen bleiben unverändert.')){ DB.vorlagen = DB.vorlagen.filter(x => x !== v); saveDB(); dlg.close(); openVorlagen(); } }
     });
   }
