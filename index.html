@@ -172,7 +172,7 @@
   .grow .gname{flex:1;font-size:14px}
   .gseg{flex:none;gap:4px}
   .gseg label{min-width:38px;flex:none;padding:4px 8px}
-  table.gb tr td.pc.struck{background-image:linear-gradient(to top right,transparent calc(50% - 1px),rgba(30,35,45,.55) calc(50% - 1px),rgba(30,35,45,.55) calc(50% + 1px),transparent calc(50% + 1px))!important;opacity:.55}
+  table.gb tr td.pc.struck{background-image:linear-gradient(to top right,transparent calc(50% - 1px),rgba(30,35,45,.55) calc(50% - 1px),rgba(30,35,45,.45) calc(50% + 1px),transparent calc(50% + 1px))!important;opacity:.7}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
   .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
   .emptystate h2{color:var(--ink)}
@@ -902,7 +902,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '29';
+  const APP_VERSION = '30';
   /* ---------- Sport: Wertungstabellen (Zeit / Weite / Höhe → Note) ---------- */
   const SP_STUF = ['1','1-','1-2','2+','2','2-','2-3','3+','3','3-','3-4','4+','4','4-','4-5','5+','5','5-','5-6','6+'];
   const spBase = n => String(n).replace(/\s+\d+([.,]\d+)?\s*(kg|g)$/i, '').trim();      // „Kugel 4 kg“ → „Kugel“
@@ -1118,7 +1118,25 @@
      Notenbuch – Darstellung
      ============================================================ */
   let solo = null;   // Einzelansicht {kid, sid}, nur für diese Sitzung
+  function repairSport29(){
+    DB.meta = DB.meta || {};
+    if (DB.meta.fixSport29 || !(DB.sport || []).length) return;
+    let n = 0;
+    DB.klassen.forEach(k => k.kats.filter(c => isSportKat(c)).forEach(c => {
+      let changed = false;
+      k.leistungen.filter(l => l.kat === c.id && l.modus === 'sport' && l.sport).forEach(l => {
+        const kl = l.sport.kl, bases = [...new Set(spTabs(kl).map(t => spBase(t.name)))];
+        const want = spMatchBase(bases, String(l.name).replace(/\s*\(\d+\)\s*$/, ''));
+        const have = spBase(l.sport.m || l.sport.w || '');
+        if (want && want !== have){ l.sport = spGuess(k, want, kl); changed = true; n++; }
+      });
+      if (changed && c.sport) c.sport = {kl:c.sport.kl, multi:true, m:'', w:''};
+    }));
+    DB.meta.fixSport29 = true;
+    if (n){ saveDB(); setTimeout(() => alert('Korrektur: Bei ' + n + ' Sport-Spalte(n) wurde die richtige Disziplin wiederhergestellt (anhand des Spaltennamens). Bitte die Noten kurz prüfen – die eingetragenen Werte waren nie verändert.'), 300); }
+  }
   function renderBuch(){
+    try { repairSport29(); } catch (e) {}
     { const k0 = aktKlasse && aktKlasse(); if (k0) k0.kats.forEach(c => { if (isSportKat(c) && !c.sport) c.sport = spGuess(k0, c.name); }); }
     $('klassenListe').innerHTML = DB.klassen.length
       ? DB.klassen.map(k => '<li data-kid="' + k.id + '" class="' + (k.id === DB.aktiv ? 'active' : '') + '"><span class="kn">' + esc(k.name) + (k.fach && !k.name.toLowerCase().includes(k.fach.toLowerCase()) ? '<small class="kf">' + esc(k.fach) + '</small>' : '') + '</span>' + badge(k.stufe) +
@@ -1684,6 +1702,10 @@
       (n ? '<div class="hint">' + n + ' Eintrag/Einträge in dieser Kategorie.</div>' : '');
     // --- Sport: Wertungstabelle zur Kategorie
     let spCfg = d.sport ? copy(d.sport) : null, spManual = !!d.sport;
+    if (spCfg && !spCfg.multi && !isNew){
+      const own = k.leistungen.filter(l => l.kat === d.id && l.modus === 'sport' && l.sport);
+      if (new Set(own.map(l => (l.sport.m || '') + '|' + (l.sport.w || ''))).size > 1) spCfg = {kl:spCfg.kl, multi:true, m:'', w:''};
+    }
     const cTyp = () => dlg.querySelector('input[name=cTyp]:checked').value;
     const renderCSport = () => {
       const box = dq('#cSport');
@@ -1743,8 +1765,10 @@
           : d.typ === 'sport' ? 'Die ' + n + ' Einträge werden zu Sportleistungen. Eingetragene Werte werden als Zeiten bzw. Weiten gelesen. Fortfahren?'
           : 'Die ' + n + ' Einträge werden zu Arbeiten/Tests mit Punkten und Notenschlüssel. Eingetragene Werte werden als Punkte gelesen. Fortfahren?')) return false;
         convertKat(k, c, d.typ, d.sport);
-      } else if (!isNew && d.typ === 'sport' && !d.sport.multi){   // geänderte Tabelle gilt für alle Spalten der Kategorie
-        k.leistungen.filter(l => l.kat === c.id && l.modus === 'sport').forEach(l => { l.sport = copy(d.sport); });
+      } else if (!isNew && d.typ === 'sport' && !d.sport.multi){
+        // geänderte Tabelle nur für Spalten übernehmen, die bisher genau der Kategorie-Tabelle folgten
+        const sig = x => JSON.stringify({kl:+(x || {}).kl, m:(x || {}).m || '', w:(x || {}).w || ''}), alt = sig(c.sport);
+        if (sig(d.sport) !== alt) k.leistungen.filter(l => l.kat === c.id && l.modus === 'sport' && sig(l.sport) === alt).forEach(l => { l.sport = copy(d.sport); });
       }
       if (!isNew){ delete c.sport; delete c.streich; }
       if (isNew) k.kats.push(d); else Object.assign(c, d);
