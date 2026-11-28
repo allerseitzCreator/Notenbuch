@@ -885,7 +885,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '23';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
+  const APP_VERSION = '24';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
   const katTyp = c => c && c.typ === 'note' ? 'note' : 'punkte';
   // Farbcodierung der Kategorien (bewusst ohne Grün/Gelb/Rot, damit sie nicht mit den Notenfarben verwechselt wird)
   const KFARBEN = [['blau','Blau','#3f6ccc'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
@@ -917,7 +917,8 @@
 
   /* ---------- Smileys (1 = lachend/dunkelgrün … 6 = weinend/rot) ---------- */
   const SM_FARBE = {1:'#1e7b34', 2:'#7bc043', 3:'#f4c430', 4:'#fbb26a', 5:'#e8731a', 6:'#d7263d'};
-  const faceOf = (stufe, v) => stufe === 'kurs' ? (v === 0 ? 6 : 5 - Math.floor((v - 1) / 3)) : Math.min(6, Math.max(1, Math.round(v)));
+  // Farbe/Smiley einer Note: halbe Noten zählen zur besseren Note (1,5 wie 1; 2,5 wie 2)
+  const faceOf = (stufe, v) => stufe === 'kurs' ? (v === 0 ? 6 : 5 - Math.floor((v - 1) / 3)) : Math.min(6, Math.max(1, Math.ceil(v - 0.5 - 1e-9)));
   const gradeColors = (stufe, v) => { const f = faceOf(stufe, v); return {bg: SM_FARBE[f], fg: (f === 1 || f === 5 || f === 6) ? '#fff' : '#1f2328'}; };
   const gradePill = (stufe, v, label, extra) => { const c = gradeColors(stufe, v); return '<span class="gpill" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(label) + (extra || '') + '</span>'; };
   function smiley(f, px){
@@ -2161,7 +2162,7 @@
     let gradeDist;
     if (pts) gradeDist = [...R.G].reverse().concat([FAIL[k.stufe]]).map(g => ({label:g.label, v:g.v, n: ok.filter(r => r.g.label === g.label).length}));
     else if (kurs) gradeDist = Array.from({length:16}, (_, i) => 15 - i).map(v => ({label:String(v).padStart(2, '0'), v, n: ok.filter(r => r.g.v === v).length}));
-    else gradeDist = [1, 2, 3, 4, 5, 6].map(v => ({label:String(v), v, n: ok.filter(r => faceOf('mittel', r.g.v) === v).length}));
+    else gradeDist = [1, 2, 3, 4, 5, 6].map(v => ({label:String(v), v, n: ok.filter(r => Math.min(6, Math.max(1, Math.round(r.g.v))) === v).length}));
     // Gesamtpunkteverteilung
     const stepOf = xs => xs.some(x => Math.abs(x * 2 - Math.round(x * 2)) > 1e-9) ? 0.25 : xs.some(x => Math.abs(x - Math.round(x)) > 1e-9) ? 0.5 : 1;
     const range = (from, to, st) => { const out = []; for (let v = from; v <= to + 1e-9; v += st) out.push(Math.round(v * 100) / 100); return out; };
@@ -2214,6 +2215,12 @@
       row(['Punkte', gName, 'Anzahl', 'Balken']);
       D.totalDist.forEach(t => row([num(t.v), t.g, t.n, bar(t.n)]));
     }
+    if (D.pts){
+      blank();
+      row(['ANGEWANDTER NOTENSCHLÜSSEL', keySummary(k.stufe, l.key)]);
+      row([gName, 'Punkte von', 'Punkte bis', 'Prozent ab', 'Anzahl']);
+      keyRows(D).forEach(r => row([r.label, num(r.from), num(r.to), num(r.from / D.R.total * 100, 1) + ' %', r.n]));
+    }
     if (D.per.length){
       blank();
       row(['AUFGABEN – ÜBERSICHT']);
@@ -2240,6 +2247,20 @@
       D.pts ? [r.ok ? num(r.pts) : (r.skip ? '-' : ''), r.ok ? pct(r.pts, D.R.total) : ''] : [],
       [r.ok ? r.g.label : (r.skip ? 'nicht mitgeschrieben' : '')])));
     download('auswertung_' + (k.name + '_' + l.name).replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.csv', '﻿' + L.join('\r\n'), 'text/csv;charset=utf-8');
+  }
+
+  // Angewandter Notenschlüssel: beste Note links (wie bei der Punkteverteilung)
+  const keyRows = D => D.R.rows.filter(r => !r.na).slice().sort((a, b) => b.from - a.from)
+    .map(r => ({label:r.g.label, v:r.g.v, from:r.from, to:r.to, n:(D.gradeDist.find(g => g.label === r.g.label) || {n:0}).n}));
+  const keyRange = r => Math.abs(r.to - r.from) < 1e-9 ? num(r.from) : num(r.to) + '–' + num(r.from);
+  function keyTable(k, D){
+    const rows = keyRows(D), th = 'style="width:58px;text-align:left;font-weight:600;color:#6b7280;font-size:11px;padding:3px 4px"';
+    return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:3px 2px;table-layout:fixed;font-size:11.5px;text-align:center;font-variant-numeric:tabular-nums">' +
+      '<tr><th ' + th + '>' + (D.kurs ? 'VP' : 'Note') + '</th>' + rows.map(r => { const c = gradeColors(k.stufe, r.v); return '<td style="background:' + c.bg + ';color:' + c.fg + ';font-weight:800;font-size:14px;border-radius:6px;padding:4px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact">' + esc(r.label) + '</td>'; }).join('') + '</tr>' +
+      '<tr><th ' + th + '>Punkte</th>' + rows.map(r => '<td style="padding:3px 0">' + keyRange(r) + '</td>').join('') + '</tr>' +
+      '<tr><th ' + th + '>Prozent</th>' + rows.map(r => '<td style="padding:2px 0;color:#6b7280">ab ' + num(r.from / D.R.total * 100, 0) + ' %</td>').join('') + '</tr>' +
+      '<tr><th ' + th + '>Anzahl</th>' + rows.map(r => '<td style="padding:3px 0;font-weight:700' + (r.n ? '' : ';color:#c4c9d2') + '">' + r.n + '</td>').join('') + '</tr>' +
+      '</table></div>';
   }
 
   // Säulendiagramm (HTML) – gemeinsam für Fenster und PDF
@@ -2277,7 +2298,7 @@
   function PdfPage(scale, mx, my){
     const ops = [], s = scale, H = 842;
     const X = x => (mx + x * s).toFixed(2), Y = y => (H - my - y * s).toFixed(2);
-    const rgb = hex => { const h = hex.replace('#', ''); return [0, 2, 4].map(i => (parseInt(h.substr(i, 2), 16) / 255).toFixed(3)).join(' '); };
+    const rgb = hex => { let h = hex.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => (parseInt(h.substr(i, 2), 16) / 255).toFixed(3)).join(' '); };
     const P = {
       ops,
       measure(t, size, bold){ _mc.font = (bold ? 'bold ' : '') + size + 'px Helvetica, Arial, sans-serif'; return _mc.measureText(String(t)).width; },
@@ -2366,6 +2387,20 @@
       bars(8, y + 6, W - 16, 72, D.totalDist.map(t => ({v:t.v, label:num(t.v), n:t.n, color:SM_FARBE[faceOf(k.stufe, gradeFor(D.R, t.v).g.v)]})), it => onStep(it.v, ls));
       P.text(W / 2, y + 87, '<- Gesamtpunkte (links Maximalpunktzahl) · Säulenhöhe = Anzahl · Farbe = Note', 6, {align:'center', color:MUT});
       y += 92 + 12;
+    }
+    // Angewandter Notenschlüssel
+    if (D.pts){
+      section('Angewandter Notenschlüssel');
+      const kr = keyRows(D), lw = 40, cw = (W - lw) / kr.length;
+      [[gname, 7], ['Punkte', 23], ['Prozent', 33], ['Anzahl', 43]].forEach(a => P.text(0, y + a[1] + 2, a[0], 6.5, {color:MUT, bold:true}));
+      kr.forEach((r, i) => {
+        const x = lw + cw * i, cx = x + cw / 2, cc = gradeColors(k.stufe, r.v);
+        P.rect(x + 1, y, cw - 2, 13, cc.bg, 3); P.text(cx, y + 9.3, r.label, 8, {align:'center', bold:true, color:cc.fg});
+        P.text(cx, y + 25, keyRange(r), kr.length > 13 ? 5.6 : 6.8, {align:'center'});
+        P.text(cx, y + 35, 'ab ' + num(r.from / D.R.total * 100, 0) + ' %', 5.8, {align:'center', color:MUT});
+        P.text(cx, y + 45, r.n, 7, {align:'center', bold:true, color:r.n ? '#1d2330' : '#c4c9d2'});
+      });
+      y += 50 + 10;
     }
     // Aufgaben
     if (D.per.length){
@@ -2487,6 +2522,8 @@
       '<div class="tile"><small>Notenbild</small>' + awChart(D.gradeDist.map(g => ({label:g.label, n:g.n, color:SM_FARBE[faceOf(k.stufe, g.v)]})), {h:62}) + '</div></div>';
     if (D.pts && D.totalDist.length)
       h += '<h3>Gesamtpunkteverteilung</h3><div class="card">' + totalChart(k, D, 70) + '<div class="axis">← Gesamtpunkte (links Maximalpunktzahl) · Säulenhöhe = Anzahl · Farbe = Note</div></div>';
+    if (D.pts)
+      h += '<h3>Angewandter Notenschlüssel</h3><div class="card">' + keyTable(k, D) + '<div class="axis">' + esc(keySummary(k.stufe, l.key)) + '</div></div>';
     if (D.per.length){
       h += '<h3>Aufgaben</h3><div class="grid">' + D.per.map(p =>
         '<div class="card"><div class="ct"><b>' + esc(p.t.name) + '</b><span>max. ' + num(p.max) + ' P</span></div>' +
@@ -2533,6 +2570,8 @@
     if (D.pts && D.totalDist.length)
       h += '<h3 class="aw-h3">Gesamtpunkteverteilung</h3><div class="aw-card">' +
         totalChart(k, D, 70) + '<div class="aw-axis">← Gesamtpunkte (links Maximalpunktzahl) · Säulenhöhe = Anzahl · Farbe = Note</div></div>';
+    if (D.pts)
+      h += '<h3 class="aw-h3">Angewandter Notenschlüssel</h3><div class="aw-card">' + keyTable(k, D) + '<div class="aw-axis">' + esc(keySummary(k.stufe, l.key)) + '</div></div>';
     if (D.per.length)
       h += '<div class="row" style="justify-content:space-between;margin:14px 0 8px"><h3 class="aw-h3" style="margin:0">Aufgaben</h3>' +
         '<div class="seg aw-seg"><label><input type="radio" name="awv" value="balken"' + (auswView === 'balken' ? ' checked' : '') + '>Balkendiagramm</label>' +
