@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Notenbuch">
-<meta name="theme-color" content="#2f5bd3">
+<meta name="theme-color" content="#5280d6">
 <link rel="apple-touch-icon" sizes="180x180" href="notenbuch-icon2-180.png">
 <link rel="apple-touch-icon" sizes="1024x1024" href="notenbuch-icon2-1024.png">
 <link rel="icon" type="image/png" sizes="512x512" href="notenbuch-icon2-512.png">
@@ -16,14 +16,14 @@
 <style>
   :root{
     --bg:#f5f6f8; --card:#fff; --ink:#1d2330; --muted:#667085; --line:#e3e6ec;
-    --accent:#2f5bd3; --accent-soft:#e8eefc; --warn:#b54708; --warn-bg:#fff6e5; --bad:#b42318; --bad-bg:#fdecea;
+    --accent:#3f6ccc; --accent-soft:#e8eefc; --grad:linear-gradient(180deg,#6a9aea,#3a5fbf); --grad-btn:linear-gradient(180deg,#5f8fe5,#3a5fbf); --warn:#b54708; --warn-bg:#fff6e5; --bad:#b42318; --bad-bg:#fdecea;
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
   body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
   header.top{background:var(--card);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
   h1{font-size:21px;margin:0;display:flex;align-items:stretch;gap:11px}
-  h1 .logo{width:42px;height:42px;flex:none;border-radius:10px;background:linear-gradient(180deg,#6a9aea,#3a5fbf);color:#fff;display:grid;place-items:center;font-size:23px}
+  h1 .logo{width:42px;height:42px;flex:none;border-radius:10px;background:var(--grad);color:#fff;display:grid;place-items:center;font-size:23px}
   h1 .titles{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;height:42px}
   h1 .appname{color:var(--accent);font-weight:700;font-size:24px;line-height:18px;margin-top:0.5px;padding-top:0}
   h1 .byline{font-size:12px;font-weight:300;color:#1d2330;white-space:nowrap;line-height:9px;margin-bottom:1px}
@@ -51,7 +51,7 @@
   .chk{display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px;font-weight:400}
   .btn{border:1px solid var(--line);background:#fff;padding:7px 12px;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
   .btn:hover{border-color:var(--accent);color:var(--accent)}
-  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary{background:var(--grad-btn);color:#fff;border-color:#3a5fbf}
   .btn.primary:hover{color:#fff;opacity:.9}
   .btn.danger{color:var(--bad);border-color:#f3c2bd;margin-right:auto}
   .btn.danger:hover{background:var(--bad-bg)}
@@ -149,7 +149,7 @@
   table.gb tr.shid{display:none}
   table.gb td.nr[data-solo]{cursor:pointer}
   table.gb td.nr[data-solo]:hover{color:var(--accent);background:#f4f7fe;text-decoration:underline}
-  table.gb.solo td.nr[data-solo]{background:var(--accent);color:#fff;font-weight:700}
+  table.gb.solo td.nr[data-solo]{background:var(--grad-btn);color:#fff;font-weight:700}
   .solobar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#eef2fb;border:1px solid #c9d3ea;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:14px}
   .solobar .sp{flex:1}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
@@ -294,7 +294,7 @@
   body.locked{overflow:hidden}
   .lkbox{background:#fff;border:1px solid var(--line);border-radius:18px;padding:30px 28px;width:min(380px,100%);text-align:center;box-shadow:0 20px 50px rgba(30,40,70,.12);display:flex;flex-direction:column;gap:10px}
   .lkbox h2{margin:6px 0 0;font-size:20px}
-  .lklogo{width:56px;height:56px;border-radius:14px;background:var(--accent);color:#fff;font-size:30px;font-weight:700;display:grid;place-items:center;margin:0 auto}
+  .lklogo{width:56px;height:56px;border-radius:14px;background:var(--grad);color:#fff;font-size:30px;font-weight:700;display:grid;place-items:center;margin:0 auto}
   .lkbox input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;text-align:center}
   .lkbox .btn{width:100%;padding:10px;font-size:15px}
   #lkErr{color:var(--bad);font-size:13px;min-height:18px}
@@ -881,7 +881,7 @@
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
   const katTyp = c => c && c.typ === 'note' ? 'note' : 'punkte';
   // Farbcodierung der Kategorien (bewusst ohne Grün/Gelb/Rot, damit sie nicht mit den Notenfarben verwechselt wird)
-  const KFARBEN = [['blau','Blau','#2f5bd3'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
+  const KFARBEN = [['blau','Blau','#3f6ccc'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
   const katFarbe = (kats, c) => { const f = c && c.farbe; if (f && KFARBEN.some(x => x[0] === f)) return f; const i = Math.max(0, kats.indexOf(c)); return KFARBEN[i % 6][0]; };
   const farbHex = f => (KFARBEN.find(x => x[0] === f) || KFARBEN[0])[2];
   const farbName = f => (KFARBEN.find(x => x[0] === f) || KFARBEN[0])[1];
