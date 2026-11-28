@@ -158,6 +158,8 @@
   .solobar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#eef2fb;border:1px solid #c9d3ea;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:14px}
   .solobar .sp{flex:1}
   #updBar{position:fixed;left:12px;right:12px;margin:0 auto;width:fit-content;bottom:18px;z-index:100;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#fff;border:1px solid #c9d3ea;box-shadow:0 10px 30px rgba(20,30,60,.22);border-radius:12px;padding:10px 14px;font-size:14px;max-width:calc(100vw - 24px)}
+  .aw-einzel .seg label{flex:none;white-space:nowrap;padding:7px 12px}
+  .aw-einzel{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px;padding:10px 12px;background:#f6f8fc;border:1px solid var(--line);border-radius:10px;font-size:13px}
   .hintrow{color:var(--muted);text-align:left!important;padding:14px!important}
   .emptystate{text-align:center;padding:50px 20px;color:var(--muted)}
   .emptystate h2{color:var(--ink)}
@@ -885,7 +887,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '24';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
+  const APP_VERSION = '25';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
   const katTyp = c => c && c.typ === 'note' ? 'note' : 'punkte';
   // Farbcodierung der Kategorien (bewusst ohne Grün/Gelb/Rot, damit sie nicht mit den Notenfarben verwechselt wird)
   const KFARBEN = [['blau','Blau','#3f6ccc'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
@@ -2140,6 +2142,10 @@
 
   /* ---------- Auswertung einer Arbeit / eines Tests ---------- */
   let auswView = 'balken';
+  // Einzelergebnisse (Namen + Noten) in PDF/Druck/CSV mitnehmen? – Wahl wird auf diesem Gerät gemerkt
+  let auswEinzel = true;
+  try { auswEinzel = localStorage.getItem('notenbuch-auswEinzel') !== '0'; } catch (e) {}
+  const einzelSuffix = () => auswEinzel ? '' : '_ohne_Einzelergebnisse';
   const hasAusw = (k, l) => !isNoteKat(k.kats.find(c => c.id === l.kat) || {}) && k.schueler.some(s => cellVal(k, l, s.id).state === 'ok');
 
   function auswData(k, l){
@@ -2240,13 +2246,15 @@
         blank();
       });
     } else blank();
+    if (auswEinzel){
     row(['EINZELERGEBNISSE']);
     row(['Nr', 'Name'].concat(D.T.map(t => t.name + ' (max ' + num(+t.max || 0) + ')'), D.pts ? ['Punkte', 'Prozent'] : [], [gName]));
     D.res.forEach(r => row([r.i + 1, r.s.name].concat(
       D.T.map((t, j) => r.ok && r.tv[j] != null ? num(r.tv[j]) : ''),
       D.pts ? [r.ok ? num(r.pts) : (r.skip ? '-' : ''), r.ok ? pct(r.pts, D.R.total) : ''] : [],
       [r.ok ? r.g.label : (r.skip ? 'nicht mitgeschrieben' : '')])));
-    download('auswertung_' + (k.name + '_' + l.name).replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.csv', '﻿' + L.join('\r\n'), 'text/csv;charset=utf-8');
+    }
+    download('auswertung_' + (k.name + '_' + l.name).replace(/[^\wäöüÄÖÜß-]+/g, '_') + einzelSuffix() + '.csv', '﻿' + L.join('\r\n'), 'text/csv;charset=utf-8');
   }
 
   // Angewandter Notenschlüssel: beste Note links (wie bei der Punkteverteilung)
@@ -2441,7 +2449,8 @@
       });
       y += 10;
     }
-    // Einzelergebnisse
+    // Einzelergebnisse (optional)
+    if (auswEinzel){
     section('Einzelergebnisse');
     const half = Math.ceil(D.res.length / 2), colW = (W - 16) / 2, rh = 12.5;
     [D.res.slice(0, half), D.res.slice(half)].forEach((list, c) => {
@@ -2459,6 +2468,7 @@
       });
     });
     y += (half + 1) * rh + 8;
+    }
     P.text(W, y + 8, 'erstellt am ' + new Date().toLocaleDateString('de-DE') + ' · Notenbuch - created by Markus Seitz', 6, {align:'right', color:MUT});
     return y + 12;
   }
@@ -2475,7 +2485,7 @@
       s = ns; W = PW / s;
     }
     P = PdfPage(s, M, M); drawAusw(P, k, l, D, W);
-    const fname = ('Auswertung_' + k.name + '_' + l.name).replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.pdf';
+    const fname = ('Auswertung_' + k.name + '_' + l.name).replace(/[^\wäöüÄÖÜß-]+/g, '_') + einzelSuffix() + '.pdf';
     download(fname, pdfBytes(P.ops), 'application/pdf');
   }
 
@@ -2534,11 +2544,13 @@
         D.per.map(p => '<tr><td><b>' + esc(p.t.name) + '</b></td><td>' + num(p.max) + '</td><td><b>' + (p.avg != null ? num(p.avg, 2) : '–') + '</b></td><td>' + (p.q != null ? num(p.q * 100, 0) + ' %' : '–') + '</td><td>' + p.full + '</td><td>' + p.zero + '</td>' +
           cols.map(v => { if (v > p.max + 1e-9) return '<td class="na"></td>'; const n = D.countIn(p.xs, v); return '<td class="' + (n ? 'has' : 'zero') + '">' + n + '</td>'; }).join('') + '</tr>').join('') + '</tbody></table>';
     }
-    // Einzelergebnisse kompakt (zweispaltig)
+    // Einzelergebnisse kompakt (zweispaltig, optional)
+    if (auswEinzel){
     const rows = D.res.map(r => '<tr><td>' + esc(r.s.name) + '</td>' + (D.pts ? '<td>' + (r.ok ? num(r.pts) : (r.skip ? '–' : '')) + '</td>' : '') + '<td>' + (r.ok ? pill(r.g.v, r.g.label) : '') + '</td></tr>');
     const half = Math.ceil(rows.length / 2), thead = '<thead><tr><th>Name</th>' + (D.pts ? '<th>Punkte</th>' : '') + '<th>' + gname + '</th></tr></thead>';
     h += '<h3>Einzelergebnisse</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><table>' + thead + '<tbody>' + rows.slice(0, half).join('') + '</tbody></table>' +
       '<table>' + thead + '<tbody>' + rows.slice(half).join('') + '</tbody></table></div>';
+    }
     h += '<div class="foot">erstellt am ' + new Date().toLocaleDateString('de-DE') + ' · Notenbuch - created by Markus Seitz</div></div>';
 
     const fname = ('Auswertung ' + k.name + ' ' + l.name).replace(/[\\/:*?"<>|]+/g, ' ');
@@ -2594,7 +2606,10 @@
     const btns = [{label:'PDF herunterladen', onClick:() => { auswPdfDownload(k, l); return false; }}, {label:'CSV herunterladen', onClick:() => { auswCsv(k, l); return false; }}, {label:'Drucken', onClick:() => { auswPdf(k, l); return false; }}];
     if (D.pts) btns.push({label:'Punkte bearbeiten', onClick:() => { setTimeout(() => openPunkte(k, l), 0); }});
     btns.push({label:'Schließen', cls:'primary'});
+    h += '<div class="aw-einzel"><span>Herunterladen, Drucken &amp; CSV:</span><div class="seg"><label><input type="radio" name="awEinzel" value="1"' + (auswEinzel ? ' checked' : '') + '>mit Einzelergebnissen</label>' +
+      '<label><input type="radio" name="awEinzel" value="0"' + (auswEinzel ? '' : ' checked') + '>ohne Einzelergebnisse</label></div><span class="hint" style="margin:0">ohne = keine Namen und Einzelnoten, nur die Klassenübersicht</span></div>';
     openDialog('Auswertung – ' + l.name + ' · ' + k.name, h, btns, true);
+    dlg.querySelectorAll('input[name=awEinzel]').forEach(r => r.addEventListener('change', () => { auswEinzel = r.value === '1'; try { localStorage.setItem('notenbuch-auswEinzel', auswEinzel ? '1' : '0'); } catch (e) {} }));
     dlg.classList.add('xwide');
     if (D.per.length){
       const draw = () => { dq('#awBody').innerHTML = body(); };
