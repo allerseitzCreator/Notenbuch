@@ -885,7 +885,7 @@
     {id:uid(), name: 'Mündlich', w:1, typ:'note'}];
   const KAT_VORSCHLAEGE = [['Klassenarbeiten','punkte'],['Klausuren','punkte'],['Tests','punkte'],['Mündlich','note'],
     ['Praktische Note','note'],['Hausaufgaben','note'],['Referate / Präsentationen','note'],['Projekt','note'],['Heftführung','note']];
-  const APP_VERSION = '22';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
+  const APP_VERSION = '23';   // bei jeder Veröffentlichung erhöhen (wie CACHE in sw.js)
   const katTyp = c => c && c.typ === 'note' ? 'note' : 'punkte';
   // Farbcodierung der Kategorien (bewusst ohne Grün/Gelb/Rot, damit sie nicht mit den Notenfarben verwechselt wird)
   const KFARBEN = [['blau','Blau','#3f6ccc'],['violett','Violett','#7c4dcc'],['petrol','Petrol','#0f8b8d'],['pink','Magenta','#c2417a'],['ocker','Ocker','#9a6b17'],['grau','Grau','#5b6577'],['keine','Keine','']];
@@ -2036,7 +2036,7 @@
   }
 
   /* ---------- Eingabefenster: Gesamtpunkte bzw. Aufgabenpunkte für alle Schüler·innen ---------- */
-  function openPunkte(k, l){
+  function openPunkte(k, l, sid){
     const auf = modusOf(l) === 'aufgaben';
     const R = compute(k.stufe, l.key), kurs = k.stufe === 'kurs';
     const T = auf ? l.aufgaben : [{id:'_', name:'Punkte', max:R.total}];
@@ -2049,7 +2049,7 @@
       T.map(t => '<th>' + esc(t.name) + '<small>max. ' + num(+t.max || 0) + '</small></th>').join('') +
       (auf ? '<th>Summe</th>' : '') + '<th>%</th><th>' + (kurs ? 'VP' : 'Note') + '</th></tr></thead><tbody>';
     k.schueler.forEach((s, i) => {
-      h += '<tr><td class="anr">' + (i + 1) + '</td><td style="text-align:left;white-space:nowrap">' + esc(s.name) + '</td>' +
+      h += '<tr><td class="anr">' + (i + 1) + '</td><td class="pname" data-psid="' + s.id + '" title="Punkte für ' + esc(s.name) + ' eintragen" style="text-align:left;white-space:nowrap;cursor:pointer">' + esc(s.name) + '</td>' +
         T.map(t => '<td><input class="pp" data-ri="' + i + '" data-sid="' + s.id + '" data-tid="' + t.id + '" value="' + esc(draft[s.id][t.id] ?? '') + '" inputmode="decimal" autocomplete="off"></td>').join('') +
         (auf ? '<td class="asum" id="ps-' + s.id + '"></td>' : '') + '<td id="pq-' + s.id + '"></td><td class="grade" id="pg-' + s.id + '"></td></tr>';
     });
@@ -2126,8 +2126,15 @@
       const next = tb.querySelector('.pp[data-ri="' + (+t.dataset.ri + (e.key === 'ArrowUp' ? -1 : 1)) + '"][data-tid="' + t.dataset.tid + '"]');
       if (next){ next.focus(); next.select(); }
     });
+    // Name in der Liste anklicken → Cursor in Aufgabe 1 dieser Person
+    tb.addEventListener('click', e => {
+      const n = e.target.closest('[data-psid]'); if (!n) return;
+      const inp = tb.querySelector('.pp[data-sid="' + n.dataset.psid + '"]'); if (inp){ inp.focus(); inp.select(); }
+    });
     upd();
-    const first = tb.querySelector('.pp'); if (first){ first.focus(); first.select(); }
+    // Cursor bei der angeklickten Person (Aufgabe 1), sonst in der ersten Zeile
+    const first = (sid && tb.querySelector('.pp[data-sid="' + sid + '"]')) || tb.querySelector('.pp');
+    if (first){ first.focus(); first.select(); if (sid) first.scrollIntoView({block:'center', inline:'nearest'}); }
   }
 
   /* ---------- Auswertung einer Arbeit / eines Tests ---------- */
@@ -2729,7 +2736,7 @@
       return openLeistung(k, l);
     }
     const ro = e.target.closest('input.ro[data-l]');
-    if (ro && k){ const l = k.leistungen.find(x => x.id === ro.dataset.l); if (l) return openPunkte(k, l); }
+    if (ro && k){ const l = k.leistungen.find(x => x.id === ro.dataset.l); if (l) return openPunkte(k, l, ro.dataset.s); }
     const td = e.target.closest('td[data-sid]');
     if (td && k) return openSchueler(k, k.schueler.find(s => s.id === td.dataset.sid));
   });
